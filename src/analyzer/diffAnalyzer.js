@@ -9,7 +9,20 @@ try {
   console.warn("Failed to fetch base branch, using local HEAD");
 }
 
-let files = execSync(`git diff --name-only origin/${base}...HEAD`)
+// Incremental review: only diff files changed since last review
+let reviewRange = `origin/${base}...HEAD`;
+try {
+  const { getLastReviewedSha } = require("../cache/cache");
+  const lastSha = getLastReviewedSha();
+  if (lastSha) {
+    reviewRange = `${lastSha}...HEAD`;
+    console.log(
+      `🔍 Incremental review: only changes since ${lastSha.slice(0, 8)}`,
+    );
+  }
+} catch (e) {}
+
+let files = execSync(`git diff --name-only ${reviewRange}`)
   .toString()
   .split("\n")
   .filter(Boolean);
@@ -116,7 +129,7 @@ filtered.forEach((f) => {
 let diff = "";
 for (const file of filtered) {
   diff += `\nFILE: ${file}\n`;
-  diff += execSync(`git diff origin/${base}...HEAD -- ${file}`).toString();
+  diff += execSync(`git diff ${reviewRange} -- ${file}`).toString();
 }
 
 fs.writeFileSync("diff.raw", diff);

@@ -22,9 +22,10 @@ async function fetchPRContext() {
       per_page: 100,
     });
 
-    // Fetch linked issues from PR body
+    // Fetch linked issues + external tickets from PR body
     let linkedIssues = [];
     try {
+      // GitHub issues: #123
       const issueRefs = (pr.body || "").match(/#(\d+)/g) || [];
       const issueNumbers = [...new Set(issueRefs.map((ref) => ref.slice(1)))];
       for (const num of issueNumbers.slice(0, 5)) {
@@ -36,12 +37,33 @@ async function fetchPRContext() {
           });
           if (issue && !issue.pull_request) {
             linkedIssues.push({
-              number: num,
+              source: "github",
+              id: `#${num}`,
               title: issue.title,
               labels: (issue.labels || []).map((l) => l.name),
             });
           }
         } catch (e) {}
+      }
+
+      // Jira tickets: PROJ-123
+      const jiraRefs = (pr.body || "").match(/\b([A-Z][A-Z0-9]+-\d+)\b/g) || [];
+      for (const ref of [...new Set(jiraRefs)].slice(0, 5)) {
+        linkedIssues.push({
+          source: "jira",
+          id: ref,
+          title: `Jira ticket ${ref}`,
+        });
+      }
+
+      // Linear tickets: LIN-123
+      const linearRefs = (pr.body || "").match(/\b(LIN-\d+)\b/gi) || [];
+      for (const ref of [...new Set(linearRefs)].slice(0, 5)) {
+        linkedIssues.push({
+          source: "linear",
+          id: ref.toUpperCase(),
+          title: `Linear ticket ${ref.toUpperCase()}`,
+        });
       }
     } catch (e) {}
 

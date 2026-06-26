@@ -53,11 +53,45 @@ function saveCache() {
     fileMeta = JSON.parse(fs.readFileSync("file-meta.json", "utf8"));
   } catch (e) {}
   const file = path.join(CACHE_DIR, `${getCacheKey()}.json`);
+  // Save last reviewed commit for incremental review tracking
+  const incremental = {
+    last_reviewed_sha: getCacheKey(),
+    reviewed_at: new Date().toISOString(),
+  };
   fs.writeFileSync(
     file,
-    JSON.stringify({ finalReview, risk, prContext, fileMeta }, null, 2),
+    JSON.stringify(
+      { finalReview, risk, prContext, fileMeta, incremental },
+      null,
+      2,
+    ),
   );
   console.log("✅ Cache saved");
+}
+
+function getLastReviewedSha() {
+  const cacheFile = path.join(CACHE_DIR, getCacheKey() + ".json");
+  if (fs.existsSync(cacheFile)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
+      return data.incremental?.last_reviewed_sha || null;
+    } catch (e) {}
+  }
+  // Fallback: check any recent cache for incremental tracking
+  try {
+    const files = fs.readdirSync(CACHE_DIR).filter((f) => f.endsWith(".json"));
+    for (const f of files.reverse()) {
+      try {
+        const data = JSON.parse(
+          fs.readFileSync(path.join(CACHE_DIR, f), "utf8"),
+        );
+        if (data.incremental?.last_reviewed_sha) {
+          return data.incremental.last_reviewed_sha;
+        }
+      } catch (e) {}
+    }
+  } catch (e) {}
+  return null;
 }
 
 if (require.main === module) {
@@ -75,4 +109,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { isCached, loadCache, saveCache };
+module.exports = { isCached, loadCache, saveCache, getLastReviewedSha };

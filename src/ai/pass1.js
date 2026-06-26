@@ -106,6 +106,9 @@ function getInstructionsForFile(filePath, config) {
         prContext.description
           ? `Description: ${prContext.description.slice(0, 2000)}`
           : "",
+        prContext.linked_issues?.length
+          ? `Linked: ${prContext.linked_issues.map((i) => i.id).join(", ")}`
+          : "",
         `Files changed: ${prContext.files_changed} | +${prContext.additions} / -${prContext.deletions}`,
         `\nChanged files:`,
         prContext.files_list,

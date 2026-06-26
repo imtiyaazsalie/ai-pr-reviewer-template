@@ -111,8 +111,10 @@ PR opened
 ### Accuracy features
 
 - **Self‑reflection pass** — AI re‑reads its own output against the diff, catches missed issues
+- **Incremental review** — on multi‑push PRs, only reviews new commits (saves ~70% API costs)
 - **Full‑file review** — files ≤ 200 lines get complete context (not just the diff)
 - **Cross‑file awareness** — detects imports and includes referenced API contracts
+- **Ticket extraction** — parses GitHub issues (#123), Jira (PROJ‑456), Linear (LIN‑789) from PR body
 - **Confidence scoring** — every issue has a confidence score (e.g. "90% sure")
 - **Suggested fixes** — one‑click `Commit suggestion` on inline comments
 - **Learning** — remembers dismissed patterns, avoids repeating false positives

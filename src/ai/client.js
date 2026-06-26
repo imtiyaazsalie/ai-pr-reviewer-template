@@ -49,7 +49,7 @@ function resolveConfig() {
   };
 }
 
-function buildOpenAIRequest({ messages, temperature }, config) {
+function buildOpenAIRequest({ messages, temperature, maxTokens }, config) {
   return {
     url: config.url,
     headers: {
@@ -60,12 +60,12 @@ function buildOpenAIRequest({ messages, temperature }, config) {
       model: config.model,
       messages,
       temperature,
-      max_tokens: 1500,
+      max_tokens: maxTokens,
     },
   };
 }
 
-function buildAnthropicRequest({ messages, temperature }, config) {
+function buildAnthropicRequest({ messages, temperature, maxTokens }, config) {
   // Anthropic uses a separate "system" field instead of system role in messages
   const systemMessages = messages.filter((m) => m.role === "system");
   const nonSystem = messages.filter((m) => m.role !== "system");
@@ -80,7 +80,7 @@ function buildAnthropicRequest({ messages, temperature }, config) {
     },
     data: {
       model: config.model,
-      max_tokens: 1500,
+      max_tokens: maxTokens,
       temperature,
       messages: nonSystem,
       ...(system ? { system } : {}),
@@ -102,7 +102,7 @@ function extractResponse(response, config) {
   return response.data.choices?.[0]?.message?.content || "";
 }
 
-async function callLLM(messages, temperature = 0.2) {
+async function callLLM(messages, temperature = 0.2, maxTokens = 1500) {
   const config = resolveConfig();
 
   if (!config.apiKey && config.provider !== "ollama") {
@@ -116,7 +116,10 @@ async function callLLM(messages, temperature = 0.2) {
 
   while (attempt < MAX_RETRIES) {
     try {
-      const request = buildRequest({ messages, temperature }, config);
+      const request = buildRequest(
+        { messages, temperature, maxTokens },
+        config,
+      );
       const response = await axios.post(request.url, request.data, {
         headers: request.headers,
         timeout: TIMEOUT,

@@ -3,6 +3,16 @@ const { callLLM } = require("./client");
 const { SYSTEM_PROMPT_PASS1 } = require("./prompts");
 const pLimit = require("p-limit");
 
+const DEPTH_CONFIG = {
+  quick: { maxTokens: 600, temperature: 0.1, label: "quick" },
+  standard: { maxTokens: 1500, temperature: 0.2, label: "standard" },
+  thorough: { maxTokens: 2500, temperature: 0.3, label: "thorough" },
+};
+
+const depth = process.env.REVIEW_DEPTH || "standard";
+const { maxTokens, temperature, label } =
+  DEPTH_CONFIG[depth] || DEPTH_CONFIG.standard;
+
 const limit = pLimit(parseInt(process.env.MAX_CONCURRENCY || "5", 10));
 
 function loadPRContext() {
@@ -83,10 +93,14 @@ function getInstructionsForFile(filePath, config) {
           .join("\n");
 
         try {
-          const response = await callLLM([
-            { role: "system", content: SYSTEM_PROMPT_PASS1 },
-            { role: "user", content: userPrompt },
-          ]);
+          const response = await callLLM(
+            [
+              { role: "system", content: SYSTEM_PROMPT_PASS1 },
+              { role: "user", content: userPrompt },
+            ],
+            temperature,
+            maxTokens,
+          );
           let issues = [];
           try {
             const parsed = JSON.parse(response);
@@ -117,5 +131,5 @@ function getInstructionsForFile(filePath, config) {
   );
 
   fs.writeFileSync("pass1.json", JSON.stringify(results, null, 2));
-  console.log("✅ Pass 1 complete");
+  console.log(`✅ Pass 1 complete (${label}, ${maxTokens} tokens)`);
 })();

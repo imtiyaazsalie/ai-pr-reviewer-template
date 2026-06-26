@@ -1,0 +1,31 @@
+name: AI Reviewer — Conversational
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  respond:
+    if: |
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '@ai-reviewer')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: imtiyaazsalie/ai-pr-reviewer-template@v1
+        with:
+          ai_provider: deepseek
+          ai_api_key: ${{ secrets.AI_API_KEY }}
+
+      - name: Reply to mention
+        shell: bash
+        run: node ${{ github.action_path }}/src/github/conversation.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_BODY: ${{ github.event.comment.body }}

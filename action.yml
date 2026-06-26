@@ -38,6 +38,10 @@ inputs:
     description: "Maximum concurrent AI calls (default 5, lower if hitting rate limits)"
     required: false
     default: "5"
+  review_depth:
+    description: "Review thoroughness: quick (security+bugs only), standard (default), thorough (everything)"
+    required: false
+    default: "standard"
   enable_semgrep:
     description: "Run Semgrep static analysis alongside AI review"
     required: false
@@ -87,6 +91,17 @@ runs:
         GITHUB_REPOSITORY: ${{ github.repository }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
 
+    - name: Generate change summary
+      if: steps.cache_check.outcome != 'success'
+      shell: bash
+      run: node ${{ github.action_path }}/src/ai/summary.js || echo '{"one_liner":""}' > pr-summary.json
+      env:
+        AI_PROVIDER: ${{ inputs.ai_provider }}
+        AI_API_KEY: ${{ inputs.ai_api_key }}
+        DEEPSEEK_API_KEY: ${{ inputs.deepseek_api_key }}
+        AI_MODEL: ${{ inputs.ai_model }}
+        AI_BASE_URL: ${{ inputs.ai_base_url }}
+
     - name: Analyze diff
       if: steps.cache_check.outcome != 'success'
       shell: bash
@@ -100,6 +115,8 @@ runs:
       if: steps.cache_check.outcome != 'success'
       shell: bash
       run: node ${{ github.action_path }}/src/analyzer/hunkSplitter.js
+      env:
+        REVIEW_DEPTH: ${{ inputs.review_depth }}
 
     - name: AI Pass 1 (detect issues)
       if: steps.cache_check.outcome != 'success'
@@ -116,6 +133,7 @@ runs:
         AI_MODEL: ${{ inputs.ai_model }}
         AI_BASE_URL: ${{ inputs.ai_base_url }}
         MAX_CONCURRENCY: ${{ inputs.max_concurrency }}
+        REVIEW_DEPTH: ${{ inputs.review_depth }}
 
     - name: AI Pass 2 (validate & deduplicate)
       if: steps.cache_check.outcome != 'success'

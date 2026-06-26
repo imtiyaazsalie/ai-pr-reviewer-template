@@ -23,6 +23,12 @@ function loadPRContext() {
   const issues = JSON.parse(fs.readFileSync("final.review.json", "utf8"));
   const prContext = loadPRContext();
 
+  // Load change summary
+  let changeSummary = null;
+  try {
+    changeSummary = JSON.parse(fs.readFileSync("pr-summary.json", "utf8"));
+  } catch (e) {}
+
   const blockers = issues.filter((i) => i.severity === "blocker");
   const warnings = issues.filter((i) => i.severity === "warning");
   const suggestions = issues.filter((i) => i.severity === "suggestion");
@@ -35,7 +41,7 @@ function loadPRContext() {
 
   const body = `## 🤖 AI Code Review
 
-${prContext?.title ? `**PR**: ${prContext.title}\n` : ""}
+${prContext?.title ? `**PR**: ${prContext.title}\n` : ""}${changeSummary?.one_liner ? `\n> ${changeSummary.one_liner}\n` : ""}
 ${riskEmoji} **Risk**: ${risk.level} (score: ${risk.score}) | **Files**: ${prContext?.files_changed || "?"} | +${prContext?.additions || "?"}/-${prContext?.deletions || "?"}
 
 ${

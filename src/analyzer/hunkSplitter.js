@@ -1,7 +1,14 @@
 const fs = require("fs");
 
-const CONTEXT_LINES = 20;
-const MAX_CHUNK_SIZE = 8000;
+const DEPTH_CONFIG = {
+  quick: { contextLines: 5, maxChunkSize: 4000 },
+  standard: { contextLines: 20, maxChunkSize: 8000 },
+  thorough: { contextLines: 40, maxChunkSize: 12000 },
+};
+
+const depth = process.env.REVIEW_DEPTH || "standard";
+const { contextLines: CONTEXT_LINES, maxChunkSize: MAX_CHUNK_SIZE } =
+  DEPTH_CONFIG[depth] || DEPTH_CONFIG.standard;
 
 function getSurroundingContext(filePath, hunkStartLine) {
   try {

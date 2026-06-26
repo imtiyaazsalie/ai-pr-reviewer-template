@@ -1,5 +1,5 @@
 name: "AI PR Reviewer"
-description: "Automatically review pull requests using DeepSeek AI with inline comments and summary"
+description: "Automatically review pull requests using AI (OpenAI, Anthropic, Groq, Ollama, DeepSeek, or any endpoint)"
 author: "imtiyaazsalie"
 
 inputs:

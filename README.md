@@ -1,6 +1,6 @@
-# AI PR Reviewer with DeepSeek
+# AI PR Reviewer
 
-This GitHub Action automatically reviews pull requests using AI (DeepSeek, OpenAI, Anthropic, Groq, or any OpenAI‑compatible endpoint). It posts **inline comments** and a **summary** — like CodeRabbit — but runs entirely on GitHub's infrastructure.
+This GitHub Action automatically reviews pull requests using AI — pick any provider: **OpenAI**, **Anthropic**, **Groq**, **Ollama**, **DeepSeek**, or any OpenAI‑compatible endpoint. It posts **inline comments** and a **summary**, like CodeRabbit, on GitHub's own infrastructure.
 
 ## Zero‑Conflict Setup
 
@@ -63,7 +63,7 @@ That's it. The action runs automatically on every PR.
 - ✅ Concurrent AI calls with configurable parallelism
 - ✅ Optional Semgrep integration (toggle on)
 - ✅ `node_modules` cached across runs — cold start eliminated after first PR
-- ✅ 17‑test unit suite validating core logic
+- ✅ 21‑test unit suite validating core logic
 
 ## All inputs
 
@@ -171,7 +171,7 @@ Set `enable_semgrep: true` — the action runs Semgrep with `config: auto` and m
 
 ### Rate limiting
 
-If you hit DeepSeek `429` responses, lower the parallelism:
+If you hit API rate limits (429 responses), lower the parallelism:
 
 ```yaml
 max_concurrency: 2   # or 1 for strict serial
@@ -198,7 +198,7 @@ flowchart LR
 
 ```bash
 npm install
-npm test   # 17 tests, <1s
+npm test   # 21 tests, <1s
 ```
 
 ## Tags & versioning

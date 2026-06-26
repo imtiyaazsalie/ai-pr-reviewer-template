@@ -1,7 +1,7 @@
 {
   "name": "ai-code-reviewer",
   "version": "1.0.0",
-  "description": "GitHub Action AI PR reviewer using DeepSeek",
+  "description": "GitHub Action AI PR reviewer — supports OpenAI, Anthropic, Groq, Ollama, DeepSeek, and more",
   "main": "index.js",
   "scripts": {
     "test": "jest"

@@ -176,6 +176,44 @@ Set `enable_semgrep: true`. The action automatically:
 
 That's it — no extra configuration, no external artifacts.
 
+### CodeQL (recommended companion)
+
+CodeQL provides deeper data‑flow analysis that complements this action. It posts its own inline annotations, so it runs as a separate workflow — no integration needed.
+
+Create `.github/workflows/codeql.yml`:
+
+```yaml
+name: CodeQL Analysis
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  schedule:
+    - cron: '0 8 * * 1'   # weekly scan for new rules
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript, python]   # pick your languages
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/analyze@v3
+```
+
+Result: Semgrep catches patterns fast, CodeQL catches deep vulnerabilities, AI catches logic/review issues. All three post inline comments on the same PR diff.
+
 ### Rate limiting
 
 If you hit API rate limits (429 responses), lower the parallelism:

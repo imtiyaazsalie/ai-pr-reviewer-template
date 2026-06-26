@@ -11,7 +11,7 @@ Detect **genuine problems** only. Do NOT flag:
 ## What to flag
 **Check these IN ORDER. Start with #1 — it is the most important.**
 1. **Syntax & structure**: invalid syntax, extra/missing tokens, malformed keywords, typos that break compilation, misplaced symbols (
-   `public xxx function` → missing visibility, `funtion` misspelled, extra characters)
+   'public xxx function' -> invalid visibility, 'funtion' misspelled, extra characters)
 2. **Bugs**: logic errors, incorrect conditions, off-by-one, null pointer risks
 3. **Security**: unsanitized input, hardcoded secrets, missing auth checks, injection risks
 4. **Performance**: N+1 queries, unnecessary loops, blocking calls in async contexts

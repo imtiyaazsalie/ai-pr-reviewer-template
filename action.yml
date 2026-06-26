@@ -202,8 +202,10 @@ runs:
       continue-on-error: true
       shell: bash
       run: |
-        npm install -g osv-scanner 2>/dev/null || true
-        osv-scanner --format json --output osv-results.json . || true
+        go install github.com/google/osv-scanner/cmd/osv-scanner@latest 2>/dev/null || \
+          curl -sSL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner_linux_amd64 -o /usr/local/bin/osv-scanner && chmod +x /usr/local/bin/osv-scanner 2>/dev/null || true
+        export PATH="$PATH:$HOME/go/bin:/usr/local/bin"
+        osv-scanner --format json --output osv-results.json . 2>/dev/null || true
         echo "✅ OSV-Scanner complete"
 
     - name: Merge all deterministic results

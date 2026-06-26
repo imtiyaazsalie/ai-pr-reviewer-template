@@ -37,16 +37,18 @@ function saveCache() {
   console.log("✅ Cache saved");
 }
 
-if (process.argv.includes("--save")) {
-  saveCache();
-} else {
-  const cached = loadCache();
-  if (cached) {
-    console.log("✅ Cache hit — skipping analysis");
-    process.exit(0);
+if (require.main === module) {
+  if (process.argv.includes("--save")) {
+    saveCache();
   } else {
-    console.log("ℹ️ No cache found — running analysis");
-    process.exit(1);
+    const cached = loadCache();
+    if (cached) {
+      console.log("✅ Cache hit — skipping analysis");
+      process.exit(0);
+    } else {
+      console.log("ℹ️ No cache found — running analysis");
+      process.exit(1);
+    }
   }
 }
 

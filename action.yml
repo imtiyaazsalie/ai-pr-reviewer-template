@@ -123,6 +123,13 @@ runs:
         GITHUB_HEAD_REF: ${{ github.head_ref }}
         CONFIG_PATH: ${{ inputs.config_path }}
 
+    - name: Build codebase index
+      if: steps.cache_check.outcome != 'success'
+      shell: bash
+      run: node ${{ github.action_path }}/src/analyzer/codebaseIndex.js
+      env:
+        GITHUB_BASE_REF: ${{ github.base_ref }}
+
     - name: Build chunks
       if: steps.cache_check.outcome != 'success'
       shell: bash

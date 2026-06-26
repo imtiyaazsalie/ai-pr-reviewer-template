@@ -79,6 +79,41 @@ function getInstructionsForFile(filePath, config) {
   const detSummary = loadDeterministicSummary();
   const chunks = JSON.parse(fs.readFileSync("chunks.json", "utf8"));
 
+  // Load codebase index for global context
+  let codebaseIndex = { index: {}, total_signatures: 0 };
+  let gitContext = {
+    recent_commits: "",
+    high_churn_files: "",
+    recent_authors: "",
+  };
+  try {
+    codebaseIndex = JSON.parse(fs.readFileSync("codebase-index.json", "utf8"));
+  } catch (e) {}
+  try {
+    gitContext = JSON.parse(fs.readFileSync("git-context.json", "utf8"));
+  } catch (e) {}
+
+  // Build relevant codebase context for changed files
+  const changedDirs = [
+    ...new Set(
+      chunks
+        .map((c) => c.file.split("/").slice(0, -1).join("/"))
+        .filter(Boolean),
+    ),
+  ];
+  const relevantFiles = Object.entries(codebaseIndex.index || {})
+    .filter(([f]) => changedDirs.some((d) => f.startsWith(d)))
+    .slice(0, 15);
+  const codebaseBlock =
+    relevantFiles.length > 0
+      ? `\n## Codebase context (functions/classes near changed files)\n${relevantFiles.map(([f, sigs]) => `**${f}**:\n${sigs.slice(0, 10).join("\n")}`).join("\n\n")}`
+      : "";
+
+  const gitBlock =
+    gitContext?.recent_commits && gitContext.recent_commits !== "N/A"
+      ? `\n## Git history\n### Recent commits on this branch:\n${gitContext.recent_commits}\n### High-churn files (frequently changed):\n${gitContext.high_churn_files}`
+      : "";
+
   // Deterministic pipeline already caught these — tell AI to skip
   const detBlock = detSummary?.total_issues
     ? [
@@ -138,6 +173,8 @@ function getInstructionsForFile(filePath, config) {
           detBlock,
           prContextBlock,
           linkedIssuesBlock,
+          gitBlock,
+          codebaseBlock,
           learningBlock,
           suppressedBlock,
           `## File: ${chunk.file}${meta.is_test ? " (test file — flag missing assertions, not helper structure)" : ""}`,

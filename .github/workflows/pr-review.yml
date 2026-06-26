@@ -1,0 +1,80 @@
+name: AI PR Reviewer
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check cache
+        id: cache_check
+        run: node -e "const {isCached} = require('./src/cache/cache'); process.exit(isCached() ? 0 : 1)"
+        continue-on-error: true
+
+      - name: Analyze diff
+        if: steps.cache_check.outcome != 'success'
+        run: node src/analyzer/diffAnalyzer.js
+
+      - name: Build chunks
+        if: steps.cache_check.outcome != 'success'
+        run: node src/analyzer/hunkSplitter.js
+
+      - name: AI Pass 1 (detect issues)
+        if: steps.cache_check.outcome != 'success'
+        run: node src/ai/pass1.js
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+
+      - name: AI Pass 2 (validate & deduplicate)
+        if: steps.cache_check.outcome != 'success'
+        run: node src/ai/pass2.js
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+
+      - name: Run Semgrep (optional)
+        if: steps.cache_check.outcome != 'success'
+        continue-on-error: true
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: auto
+          output: semgrep-results.json
+
+      - name: Merge static analysis
+        if: steps.cache_check.outcome != 'success'
+        run: node src/utils/mergeStatic.js
+
+      - name: Risk scoring
+        if: steps.cache_check.outcome != 'success'
+        run: node src/scoring/risk.js
+
+      - name: Post inline reviews
+        run: node src/github/reviews.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post summary comment
+        run: node src/github/comments.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Save cache
+        if: steps.cache_check.outcome != 'success'
+        run: node src/cache/cache.js --save

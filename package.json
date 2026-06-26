@@ -1,0 +1,17 @@
+{
+  "name": "ai-code-reviewer",
+  "version": "1.0.0",
+  "description": "GitHub Action AI PR reviewer using DeepSeek",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@octokit/rest": "^20.0.0",
+    "axios": "^1.6.0",
+    "js-yaml": "^4.1.0",
+    "p-limit": "^5.0.0"
+  },
+  "author": "",
+  "license": "MIT"
+}

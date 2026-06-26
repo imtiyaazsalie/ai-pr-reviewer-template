@@ -1,0 +1,7 @@
+workspaces:
+  - "packages/*"
+  - "apps/*"
+ignore:
+  - "**/*.test.js"
+  - "**/*.spec.js"
+  - "docs/**"

@@ -1,0 +1,59 @@
+# .pr-reviewer.yml — AI PR Reviewer configuration
+# Place this in your repo root (or .github/ folder) to customize behavior
+
+# ── Tool settings ──────────────────────────────────────────────
+tools:
+  review:
+    enabled: true
+    num_max_findings: 15        # max issues to report (0 = unlimited)
+    inline_comments: true        # post line-specific comments
+    persistent_comment: true     # update rather than new comment on each push
+    require_score: true          # show risk score
+    require_security_review: true
+    require_estimate_effort: true
+    extra_instructions: ""       # added to the review prompt
+
+  describe:
+    enabled: true
+    publish_description_as_comment: true
+    add_pr_summary: true
+    extra_instructions: ""
+
+  improve:
+    enabled: true
+    num_code_suggestions: 5
+    inline_suggestions: true
+    extra_instructions: ""
+
+  ask:
+    enabled: true                # allow @ai-reviewer conversational replies
+
+# ── PR processing ──────────────────────────────────────────────
+pr_processing:
+  max_files_to_review: 30       # cap number of chunks (compresses low-priority)
+  max_tokens_per_file: 8000     # max token budget per file
+  prioritize_security_files: true
+  skip_generated_files: true
+  skip_asset_files: true
+  context_lines: 20             # lines of surrounding code to include
+
+# ── AI provider ────────────────────────────────────────────────
+ai:
+  model: deepseek-chat          # override model for all tools
+  temperature: 0.2
+  max_tokens: 1500
+  # fallback_models: []         # try these if the primary model fails
+
+# ── Deterministic tools ────────────────────────────────────────
+deterministic:
+  megalinter: true               # 50+ linters (style, bugs, secrets)
+  trivy: true                    # secrets + dependency vulns
+  osv_scanner: true              # dependency CVEs
+  semgrep: false                 # optional (rate-limited free tier)
+
+# ── Output ─────────────────────────────────────────────────────
+output:
+  persistent_comment: true       # update existing comment on push
+  auto_label: true               # tag PR with risk, size, domain labels
+  show_review_effort: true       # show effort estimate (1-5)
+  show_relevant_config: false    # show active config in review footer

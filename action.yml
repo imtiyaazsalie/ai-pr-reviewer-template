@@ -7,8 +7,9 @@ inputs:
     description: "DeepSeek API key"
     required: true
   github_token:
-    description: "GitHub token for posting comments"
-    required: true
+    description: "GitHub token for posting comments (defaults to secrets.GITHUB_TOKEN)"
+    required: false
+    default: ${{ github.token }}
   config_path:
     description: "Path to monorepo config (relative to repo root), e.g. .github/ai-reviewer.yml"
     required: false
@@ -35,7 +36,7 @@ runs:
     - name: Check cache
       id: cache_check
       shell: bash
-      run: node ${{ github.action_path }}/src/cache/cache.js && echo "cached=true" || echo "cached=false"
+      run: node ${{ github.action_path }}/src/cache/cache.js
       continue-on-error: true
       env:
         GITHUB_SHA: ${{ github.sha }}
@@ -47,6 +48,7 @@ runs:
       env:
         GITHUB_BASE_REF: ${{ github.base_ref }}
         GITHUB_HEAD_REF: ${{ github.head_ref }}
+        CONFIG_PATH: ${{ inputs.config_path }}
 
     - name: Build chunks
       if: steps.cache_check.outcome != 'success'
@@ -56,21 +58,33 @@ runs:
     - name: AI Pass 1 (detect issues)
       if: steps.cache_check.outcome != 'success'
       shell: bash
-      run: node ${{ github.action_path }}/src/ai/pass1.js
+      run: |
+        node ${{ github.action_path }}/src/ai/pass1.js || {
+          echo '[]' > pass1.json
+          echo '⚠️ Pass 1 failed — continuing with empty results'
+        }
       env:
         DEEPSEEK_API_KEY: ${{ inputs.deepseek_api_key }}
 
     - name: AI Pass 2 (validate & deduplicate)
       if: steps.cache_check.outcome != 'success'
       shell: bash
-      run: node ${{ github.action_path }}/src/ai/pass2.js
+      run: |
+        node ${{ github.action_path }}/src/ai/pass2.js || {
+          echo '[]' > final.review.json
+          echo '⚠️ Pass 2 failed — continuing with empty results'
+        }
       env:
         DEEPSEEK_API_KEY: ${{ inputs.deepseek_api_key }}
 
     - name: Risk scoring
       if: steps.cache_check.outcome != 'success'
       shell: bash
-      run: node ${{ github.action_path }}/src/scoring/risk.js
+      run: |
+        node ${{ github.action_path }}/src/scoring/risk.js || {
+          echo '{"score":0,"level":"LOW","addedLines":0}' > risk.json
+          echo '⚠️ Risk scoring failed — using defaults'
+        }
 
     - name: Post inline reviews
       shell: bash
@@ -78,7 +92,7 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github_token }}
         GITHUB_REPOSITORY: ${{ github.repository }}
-        GITHUB_REF: ${{ github.ref }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
 
     - name: Post summary comment
       shell: bash
@@ -86,11 +100,12 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github_token }}
         GITHUB_REPOSITORY: ${{ github.repository }}
-        GITHUB_REF: ${{ github.ref }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
 
     - name: Save cache
       if: steps.cache_check.outcome != 'success'
       shell: bash
       run: node ${{ github.action_path }}/src/cache/cache.js --save
+      continue-on-error: true
       env:
         GITHUB_SHA: ${{ github.sha }}

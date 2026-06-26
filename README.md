@@ -29,8 +29,9 @@ jobs:
       - uses: imtiyaazsalie/ai-pr-reviewer-template@main
         with:
           deepseek_api_key: ${{ secrets.DEEPSEEK_API_KEY }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+That's the only file you need. The default `GITHUB_TOKEN` is used automatically for posting comments — no extra secret required.
 
 ### 2. Add your DeepSeek API key
 

@@ -1,18 +1,28 @@
-const fs = require('fs');
-const { Octokit } = require('@octokit/rest');
+const fs = require("fs");
+const { Octokit } = require("@octokit/rest");
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-const [owner, repo] = (process.env.GITHUB_REPOSITORY || '').split('/');
-const pullNumber = process.env.GITHUB_REF?.replace('refs/pull/', '').replace('/merge', '');
+const [owner, repo] = (process.env.GITHUB_REPOSITORY || "").split("/");
+const pullNumber = process.env.PR_NUMBER;
 
-if (!pullNumber) process.exit(1);
+if (!pullNumber) {
+  console.error("PR_NUMBER not set");
+  process.exit(1);
+}
 
 (async () => {
-  const risk = JSON.parse(fs.readFileSync('risk.json', 'utf8'));
-  const issues = JSON.parse(fs.readFileSync('final.review.json', 'utf8'));
+  const risk = JSON.parse(fs.readFileSync("risk.json", "utf8"));
+  const issues = JSON.parse(fs.readFileSync("final.review.json", "utf8"));
 
-  let issueList = issues.length === 0 ? '✅ No critical issues found.' :
-    issues.map(i => `- **${i.severity || 'info'}** (${i.file || 'unknown'}#L${i.line || '?'}): ${i.message}`).join('\n');
+  let issueList =
+    issues.length === 0
+      ? "✅ No critical issues found."
+      : issues
+          .map(
+            (i) =>
+              `- **${i.severity || "info"}** (${i.file || "unknown"}#L${i.line || "?"}): ${i.message}`,
+          )
+          .join("\n");
 
   const body = `
 ## 🤖 AI Code Review Summary
@@ -27,9 +37,14 @@ ${issueList}
 `;
 
   try {
-    await octokit.issues.createComment({ owner, repo, issue_number: parseInt(pullNumber, 10), body });
-    console.log('✅ Summary posted');
+    await octokit.issues.createComment({
+      owner,
+      repo,
+      issue_number: parseInt(pullNumber, 10),
+      body,
+    });
+    console.log("✅ Summary posted");
   } catch (err) {
-    console.error('Failed to post summary:', err.message);
+    console.error("Failed to post summary:", err.message);
   }
 })();

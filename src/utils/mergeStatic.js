@@ -50,7 +50,7 @@ try {
             message:
               `${toolName}: ${result.ruleId || ""} — ${result.message?.text || ""}`.slice(
                 0,
-                200,
+                300,
               ),
             source: "megalinter",
             category: "code_quality",
@@ -109,7 +109,7 @@ try {
           message:
             `Misconfiguration: ${mcfg.Title || mcfg.ID} — ${mcfg.Description || ""}`.slice(
               0,
-              200,
+              300,
             ),
           source: "trivy",
           category: "infra",

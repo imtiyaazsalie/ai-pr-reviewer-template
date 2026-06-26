@@ -18,48 +18,162 @@ function loadPRContext() {
   }
 }
 
+function formatIssue(issue) {
+  const prefix =
+    { blocker: "🔴", warning: "🟡", suggestion: "🔵" }[issue.severity] || "⚪";
+
+  let sourceLabel = "";
+  if (issue.source && issue.source !== "ai") {
+    sourceLabel = ` [${issue.source}]`;
+  }
+
+  // Code files get file#Lline format
+  if (issue.file && issue.line && !isDependencyFile(issue.file)) {
+    return `${prefix} **\`${issue.file}#L${issue.line}\`**${sourceLabel}: ${issue.message}`;
+  }
+
+  // Dependency issues get package name format
+  if (issue.file && isDependencyFile(issue.file)) {
+    return `${prefix} ${sourceLabel} ${issue.message}`;
+  }
+
+  // No file info — just message
+  return `${prefix}${sourceLabel} ${issue.message}`;
+}
+
+function isDependencyFile(filePath) {
+  return (
+    !filePath ||
+    !filePath.includes("/") ||
+    !filePath.includes(".") ||
+    filePath.endsWith(".lock") ||
+    /^[a-z][a-z0-9._-]*\/[a-z]/.test(filePath) || // npm/composer style
+    !fs.existsSync(filePath)
+  );
+}
+
 (async () => {
   const risk = JSON.parse(fs.readFileSync("risk.json", "utf8"));
   const issues = JSON.parse(fs.readFileSync("final.review.json", "utf8"));
   const prContext = loadPRContext();
 
-  // Load change summary
   let changeSummary = null;
   try {
     changeSummary = JSON.parse(fs.readFileSync("pr-summary.json", "utf8"));
   } catch (e) {}
 
-  const blockers = issues.filter((i) => i.severity === "blocker");
-  const warnings = issues.filter((i) => i.severity === "warning");
-  const suggestions = issues.filter((i) => i.severity === "suggestion");
-  const withFixes = issues.filter(
+  // Separate AI issues from tool issues
+  const aiIssues = issues.filter((i) => !i.source || i.source === "ai");
+  const toolIssues = issues.filter((i) => i.source && i.source !== "ai");
+
+  // Categorize
+  const codeIssues = aiIssues.filter(
+    (i) => i.file && !isDependencyFile(i.file),
+  );
+  const depIssues = [
+    ...aiIssues.filter((i) => !i.file || isDependencyFile(i.file)),
+    ...toolIssues,
+  ];
+
+  const blockers = codeIssues.filter((i) => i.severity === "blocker");
+  const warnings = codeIssues.filter((i) => i.severity === "warning");
+  const suggestions = codeIssues.filter((i) => i.severity === "suggestion");
+  const withFixes = codeIssues.filter(
     (i) => i.suggestion && i.suggestion !== "null",
   );
 
   const riskEmoji =
     risk.level === "HIGH" ? "🔴" : risk.level === "MEDIUM" ? "🟡" : "🟢";
 
-  const body = `## 🤖 AI Code Review
+  const parts = [];
 
-${prContext?.title ? `**PR**: ${prContext.title}\n` : ""}${changeSummary?.one_liner ? `\n> ${changeSummary.one_liner}\n` : ""}
-${riskEmoji} **Risk**: ${risk.level} (score: ${risk.score}) | **Files**: ${prContext?.files_changed || "?"} | +${prContext?.additions || "?"}/-${prContext?.deletions || "?"}
+  // Header
+  parts.push("## 🤖 AI Code Review");
+  if (changeSummary?.one_liner) {
+    parts.push(`\n> ${changeSummary.one_liner}`);
+  }
+  parts.push(
+    `\n${riskEmoji} **Risk**: ${risk.level} (score: ${risk.score}) | **Files**: ${prContext?.files_changed || "?"} | +${prContext?.additions || "?"} / -${prContext?.deletions || "?"}`,
+  );
 
-${
-  issues.length === 0
-    ? "### ✅ No issues found\n\nNo blockers, warnings, or suggestions detected."
-    : `### Issues (${issues.length})
-| Severity | Count |
-|---|---|
-${blockers.length ? `| 🔴 Blocker | ${blockers.length} |\n` : ""}${warnings.length ? `| 🟡 Warning | ${warnings.length} |\n` : ""}${suggestions.length ? `| 🔵 Suggestion | ${suggestions.length} |` : ""}
+  // Code issues (AI findings)
+  if (codeIssues.length > 0) {
+    parts.push(`\n### 📝 Code Review (${codeIssues.length} issues)`);
+    parts.push("\n| Severity | Count |");
+    parts.push("|---|---|");
+    if (blockers.length) parts.push(`| 🔴 Blocker | ${blockers.length} |`);
+    if (warnings.length) parts.push(`| 🟡 Warning | ${warnings.length} |`);
+    if (suggestions.length)
+      parts.push(`| 🔵 Suggestion | ${suggestions.length} |`);
+    if (withFixes.length) {
+      parts.push(
+        `\n💡 **${withFixes.length} issue(s) have suggested fixes** — click the inline comments to commit.`,
+      );
+    }
+    if (blockers.length) {
+      parts.push(`\n#### 🔴 Blockers`);
+      blockers.forEach((i) => parts.push(`- ${formatIssue(i)}`));
+    }
+    if (warnings.length) {
+      parts.push(`\n#### 🟡 Warnings`);
+      warnings.forEach((i) => parts.push(`- ${formatIssue(i)}`));
+    }
+    if (suggestions.length) {
+      parts.push(`\n#### 🔵 Suggestions`);
+      suggestions.forEach((i) => parts.push(`- ${formatIssue(i)}`));
+    }
+  } else {
+    parts.push("\n### 📝 Code Review");
+    parts.push(
+      "\nNo code-level issues detected in the diff. " +
+        (toolIssues.length > 0
+          ? "See below for dependency and security scan results."
+          : ""),
+    );
+  }
 
-${withFixes.length > 0 ? `\n💡 ${withFixes.length} issue(s) include suggested fixes — click **Commit suggestion** on the inline comments.\n` : ""}
+  // Dependency & security issues (tools)
+  if (depIssues.length > 0) {
+    parts.push(`\n### 📦 Dependencies & Security (${depIssues.length} issues)`);
+    parts.push("\nFound by automated scanners — not AI-reviewed.");
+    const bySource = {};
+    depIssues.forEach((i) => {
+      const src = i.source || "unknown";
+      if (!bySource[src]) bySource[src] = [];
+      bySource[src].push(i);
+    });
 
-${blockers.length ? `\n#### 🔴 Blockers\n${blockers.map((i) => `- **\`${i.file || "?"}#L${i.line || "?"}\`**: ${i.message}`).join("\n")}\n` : ""}
-${warnings.length ? `\n#### 🟡 Warnings\n${warnings.map((i) => `- **\`${i.file || "?"}#L${i.line || "?"}\`**: ${i.message}`).join("\n")}\n` : ""}`
-}
+    for (const [source, srcIssues] of Object.entries(bySource)) {
+      const sourceLabel =
+        {
+          megalinter: "MegaLinter",
+          trivy: "Trivy",
+          "osv-scanner": "OSV-Scanner",
+          semgrep: "Semgrep",
+        }[source] || source;
+      parts.push(`\n**${sourceLabel}** (${srcIssues.length}):`);
+      srcIssues.slice(0, 15).forEach((i) => parts.push(`- ${i.message}`));
+      if (srcIssues.length > 15) {
+        parts.push(`- ... and ${srcIssues.length - 15} more`);
+      }
+    }
+  }
 
----
-<sub>Generated automatically. [Configurable](https://github.com/imtiyaazsalie/ai-pr-reviewer-template)</sub>`;
+  // Summary section
+  parts.push("\n---");
+  const toolNames = [
+    ...new Set(toolIssues.map((i) => i.source).filter(Boolean)),
+  ];
+  if (toolNames.length > 0) {
+    parts.push(
+      `\n🔍 Static analysis: ${toolNames.join(", ")} | 🤖 AI review: ${codeIssues.length} findings`,
+    );
+  }
+  parts.push(
+    "<sub>[Configurable](https://github.com/imtiyaazsalie/ai-pr-reviewer-template)</sub>",
+  );
+
+  const body = parts.join("\n");
 
   try {
     await octokit.issues.createComment({

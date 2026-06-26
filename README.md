@@ -1,18 +1,17 @@
 # AI PR Reviewer
 
-This GitHub Action automatically reviews pull requests using AI — pick any provider: **OpenAI**, **Anthropic**, **Groq**, **Ollama**, **DeepSeek**, or any OpenAI‑compatible endpoint. It posts **inline comments** and a **summary**, like CodeRabbit, on GitHub's own infrastructure.
+A GitHub Action that reviews pull requests using AI — pick any provider: **OpenAI**, **Anthropic**, **Groq**, **Ollama**, **DeepSeek**, or any OpenAI‑compatible endpoint. Posts **inline comments** with suggested fixes, a **summary**, and auto‑labels your PRs.
 
-## Zero‑Conflict Setup
+Built on the proven architecture of pr-agent (11.8K ★), with unique additions: deterministic security scanning and multi‑provider AI support.
 
-Because this is a **composable GitHub Action**, you do **not** copy any files into your repo.
-You just add **one workflow file** and you're done. Nothing conflicts. Nothing to maintain.
+## Setup (30 seconds)
 
 ### 1. Add the workflow file
 
-Create `.github/workflows/pr-review.yml` in your repository:
+Create `.github/workflows/pr-review.yml`:
 
 ```yaml
-name: AI PR Reviewer
+name: PR Review
 
 on:
   pull_request:
@@ -25,93 +24,139 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      issues: write
     steps:
       - uses: imtiyaazsalie/ai-pr-reviewer-template@v1
         with:
-          ai_provider: deepseek
           ai_api_key: ${{ secrets.AI_API_KEY }}
 ```
 
-That's the only file you need. The default `GITHUB_TOKEN` is used automatically for posting comments — no extra secret required.
+### 2. Add your API key
 
-### 2. Add your AI API key
+Go to **Settings → Secrets and variables → Actions** and add `AI_API_KEY`.
 
-Go to **Settings → Secrets and variables → Actions** in your repo and add:
+That's it. The action reviews every PR automatically.
 
-| Secret | Value |
-|---|---|
-| `AI_API_KEY` | Your provider's API key |
+## Configuration
 
-That's it. The action runs automatically on every PR.
+Create `.pr-reviewer.yml` in your repo root to customize behavior:
 
-### How it avoids conflicts
+```yaml
+# AI provider
+ai:
+  provider: deepseek              # deepseek, openai, anthropic, groq, ollama
+  model: deepseek-chat            # optional — defaults per provider
+  temperature: 0.2
+  max_tokens: 1500
 
-| Problem | Solution |
-|---|---|
-| `package.json` / `package-lock.json` | Lives in **this** repo, not yours. Nothing to merge. |
-| `node_modules/` | Cached with `actions/cache@v4`. Installed in action directory at runtime. |
-| Source files (`src/`) | Referenced by path inside the action. Zero files land in your tree. |
-| Config files | Optional; create a config file in **your** repo if you need monorepo support. |
+# Tools
+tools:
+  review:
+    enabled: true
+    depth: standard               # quick | standard | thorough
+    num_max_findings: 15
+    inline_comments: true
+  describe:
+    enabled: true                 # AI-generated PR summary
+  improve:
+    enabled: true                 # refactoring suggestions
+    num_code_suggestions: 5
+  ask:
+    enabled: true                 # @ai-reviewer conversational replies
+
+# Deterministic security scanning (free, unlimited)
+deterministic:
+  megalinter: true                # 50+ linters for style, bugs, secrets
+  trivy: true                     # secrets + dep vulns + misconfigs
+  osv_scanner: true               # dependency CVEs
+  semgrep: false                  # optional (rate-limited free tier)
+
+# Output
+output:
+  auto_label: true                # tag PRs: risk:high, size:xl, database, etc.
+  show_review_effort: true        # effort estimate (1-5)
+```
+
+## How it works
+
+```
+PR opened
+    │
+    ├─ Layer 1: Deterministic (free, 100% accurate)
+    │   ├─ MegaLinter (50+ linters)
+    │   ├─ Trivy (secrets, deps, misconfigs)
+    │   └─ OSV-Scanner (dependency CVEs)
+    │
+    └─ Layer 2: AI Review
+        ├─ /describe — AI-generated PR summary
+        ├─ /review  — code review with self-reflection
+        ├─ /improve — refactoring suggestions
+        └─ /ask     — @ai-reviewer conversational replies
+            │
+            ▼
+    Unified summary + inline comments + auto-labels
+```
 
 ## Features
 
-### Deterministic pipeline (free, 100% accurate)
+### AI Review Tools
 
-Runs first — catches what AI would miss or be wrong about:
+| Tool | What it does |
+|---|---|
+| `/review` | Full code review — security, bugs, logic, performance. Two-pass with self‑reflection. |
+| `/describe` | AI‑generated PR summary — what changed and what to focus on. |
+| `/improve` | Refactoring and code quality suggestions (distinct from bug findings). |
+| `/ask` | Mention `@ai-reviewer` on any PR comment for follow‑up questions. |
 
-| Tool | Catches | Cost |
+### Accuracy features
+
+- **Self‑reflection pass** — AI re‑reads its own output against the diff, catches missed issues
+- **Full‑file review** — files ≤ 200 lines get complete context (not just the diff)
+- **Cross‑file awareness** — detects imports and includes referenced API contracts
+- **Confidence scoring** — every issue has a confidence score (e.g. "90% sure")
+- **Suggested fixes** — one‑click `Commit suggestion` on inline comments
+- **Learning** — remembers dismissed patterns, avoids repeating false positives
+
+### Performance features
+
+- **PR compression** — token‑budgets files by priority (auth=5, tests=1) for large PRs
+- **Commit caching** — never re‑reviews the same commit twice
+- **`node_modules` caching** — cold start eliminated after first PR
+- **Three review depths** — `quick` (600 tokens), `standard` (1500), `thorough` (2500)
+
+### Deterministic pipeline (free, unlimited)
+
+| Tool | Catches | Speed |
 |---|---|---|
-| **MegaLinter** | 50+ linters: style, formatting, language-specific bugs (ESLint, PHPStan, Rubocop, Pylint, etc.) | Free, unlimited |
-| **Trivy** | Secrets in config files, dependency vulns, Docker/infra misconfigs | Free, unlimited |
-| **OSV-Scanner** | Known CVEs in dependencies (npm, pip, gem, cargo, etc.) | Free, unlimited |
+| **MegaLinter** | Style, formatting, language‑specific bugs via 50+ dedicated linters | ~45s |
+| **Trivy** | Secrets in files, dependency vulns, Docker/infra misconfigs | ~15s |
+| **OSV‑Scanner** | Known CVEs in dependencies (npm, pip, gem, cargo, etc.) | ~10s |
 
-All three run in ~45 seconds. Results are merged into the review alongside AI findings. Toggle any off: `enable_megalinter: false`, `enable_trivy: false`, `enable_osv_scanner: false`.
+All deterministic findings are merged into the review alongside AI findings. Each tool can be toggled off in `.pr-reviewer.yml`.
 
-> **Why MegaLinter instead of Semgrep?** Semgrep's free tier is rate‑limited (~100 scans/month). MegaLinter is fully unlimited, runs offline, and covers 50+ languages with dedicated linters — ESLint for JS, PHPStan for PHP, Rubocop for Ruby, Pylint for Python, and more. Semgrep is still available as an optional toggle.
+### Output
 
-The AI receives the deterministic results and focuses **only** on:
-- Logic errors and design issues
-- Edge cases that pattern matchers can't catch
-- PR‑level architectural concerns
-- Suggested fixes for flagged issues
+- **Inline comments** on specific lines with severity, confidence, and suggested fixes
+- **Summary comment** with risk score, severity breakdown, and deterministic scan results
+- **Auto‑labels** — `risk:high`, `has-blockers`, `database`, `ui`, `size:xl`, `clean`, etc.
 
-This reduces AI token usage by ~60% since it skips categories already covered by the deterministic pipeline.
-
-- ✅ Full‑file review for files ≤ 200 lines — catches pre‑existing errors
-- ✅ Inline line‑specific comments with suggested fixes (one‑click commit)
-- ✅ Two‑pass AI validation — deduplicates and removes false positives
-- ✅ Confidence scoring (e.g. "90% sure") on every issue
-- ✅ Monorepo‑aware with optional `.ai-reviewer.yml` config
-- ✅ Commit‑level caching — never re‑review the same commit twice
-- ✅ Risk scoring with file‑criticality weighting
-- ✅ Three review depths: `quick`, `standard`, `thorough`
-- ✅ Conversational `@ai-reviewer` on any PR comment
-- ✅ Auto‑labeling (risk, size, domain tags)
-- ✅ 21‑test unit suite validating core logic
-
-## All inputs
-
-### AI provider
+## All workflow inputs
 
 | Input | Required | Default | Description |
 |---|---|---|---|
-| `ai_provider` | No | `deepseek` | `deepseek`, `openai`, `anthropic`, `groq`, or `ollama` |
-| `ai_api_key` | Yes¹ | — | API key for the chosen provider |
-| `ai_model` | No | provider default | Override the model (e.g. `gpt-4o`, `claude-3-5-sonnet`) |
-| `ai_base_url` | No | provider default | Custom endpoint (for self‑hosted, proxies, or any OpenAI‑compatible API) |
-| `deepseek_api_key` | No² | — | Legacy input; use `ai_api_key` instead |
-
-> ¹ Not required for `ollama`.  
-> ² Exists for backwards compatibility. Falls back to `ai_api_key`.
-
-### Other inputs
-
-| Input | Required | Default | Description |
-|---|---|---|---|
-| `github_token` | No | `${{ github.token }}` | Token for posting PR comments |
-| `enable_semgrep` | No | `false` | Run Semgrep static analysis alongside AI review |
-| `max_concurrency` | No | `5` | Max concurrent AI calls (lower if hitting rate limits) |
-| `config_path` | No | `""` | Path to monorepo config (e.g. `.github/ai-reviewer.yml`) |
+| `ai_api_key` | Yes | — | API key for your AI provider |
+| `ai_provider` | No | `deepseek` | `deepseek`, `openai`, `anthropic`, `groq`, `ollama` |
+| `ai_model` | No | provider default | Override model (e.g. `gpt-4o`, `claude-3-5-sonnet`) |
+| `ai_base_url` | No | provider default | Custom endpoint for any OpenAI‑compatible API |
+| `github_token` | No | `${{ github.token }}` | Token for posting comments |
+| `config_path` | No | auto‑detected | Path to `.pr-reviewer.yml` |
+| `review_depth` | No | `standard` | `quick`, `standard`, `thorough` |
+| `max_concurrency` | No | `5` | Max concurrent AI calls |
+| `enable_megalinter` | No | `true` | Run MegaLinter |
+| `enable_trivy` | No | `true` | Run Trivy |
+| `enable_osv_scanner` | No | `true` | Run OSV‑Scanner |
+| `enable_semgrep` | No | `false` | Optional Semgrep (rate‑limited) |
+| `enable_improve` | No | `true` | Run /improve suggestions |
 
 ### Provider examples
 
@@ -132,7 +177,7 @@ This reduces AI token usage by ~60% since it skips categories already covered by
     ai_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
-**Groq**
+**Groq (fast, cheap)**
 ```yaml
 - uses: imtiyaazsalie/ai-pr-reviewer-template@v1
   with:
@@ -141,7 +186,7 @@ This reduces AI token usage by ~60% since it skips categories already covered by
     max_concurrency: 2
 ```
 
-**Ollama (local, free)**
+**Ollama (local, free, unlimited)**
 ```yaml
 - uses: imtiyaazsalie/ai-pr-reviewer-template@v1
   with:
@@ -149,130 +194,65 @@ This reduces AI token usage by ~60% since it skips categories already covered by
     ai_model: llama3.1
 ```
 
-**Any OpenAI-compatible endpoint**
+**Any OpenAI‑compatible endpoint**
 ```yaml
 - uses: imtiyaazsalie/ai-pr-reviewer-template@v1
   with:
     ai_base_url: https://your-api.company.com/v1/chat/completions
-    ai_model: your-model
-    ai_api_key: ${{ secrets.CUSTOM_API_KEY }}
+    ai_model: custom-model
+    ai_api_key: ${{ secrets.CUSTOM_KEY }}
 ```
 
-### Full example with all options
+## Companion workflows
+
+### CodeQL (deep semantic security)
+
+Create `.github/workflows/codeql.yml` — CodeQL finds SQLi, XSS, and data‑flow vulnerabilities. It posts its own inline annotations, so it runs as a separate workflow.
 
 ```yaml
-- uses: imtiyaazsalie/ai-pr-reviewer-template@v1
-  with:
-    ai_provider: anthropic
-    ai_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-    ai_model: claude-3-5-sonnet-latest
-    enable_semgrep: true
-    max_concurrency: 3
-    config_path: .github/ai-reviewer.yml
-```
-
-## Advanced configuration
-
-### Monorepo support
-
-Create a YAML config file in your repo (default path is `config/monorepo.yml`, or use `config_path` to customize):
-
-```yaml
-workspaces:
-  - "packages/*"
-  - "apps/*"
-ignore:
-  - "**/*.test.js"
-  - "**/*.spec.js"
-  - "docs/**"
-```
-
-Without a config, the action auto‑filters out lockfiles, `dist/`, `node_modules/`, and markdown files.
-
-### Semgrep integration
-
-Set `enable_semgrep: true`. The action automatically:
-
-1. Installs Semgrep via `pip3`
-2. Runs `semgrep scan --config auto` against your repo
-3. Converts the findings (ERROR → blocker, else → warning)
-4. **Merges** them with the AI review, deduplicating overlapping issues
-
-That's it — no extra configuration, no external artifacts.
-
-### CodeQL (recommended companion)
-
-CodeQL provides deeper data‑flow analysis that complements this action. It posts its own inline annotations, so it runs as a separate workflow — no integration needed.
-
-Create `.github/workflows/codeql.yml`:
-
-```yaml
-name: CodeQL Analysis
-
+name: CodeQL
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  schedule:
-    - cron: '0 8 * * 1'   # weekly scan for new rules
-
 jobs:
   analyze:
     runs-on: ubuntu-latest
     permissions:
       security-events: write
       contents: read
-
     strategy:
-      fail-fast: false
       matrix:
-        language: [javascript, python]   # pick your languages
-
+        language: [javascript, python]
     steps:
       - uses: actions/checkout@v4
       - uses: github/codeql-action/init@v3
-        with:
-          languages: ${{ matrix.language }}
+        with: { languages: ${{ matrix.language }} }
       - uses: github/codeql-action/autobuild@v3
       - uses: github/codeql-action/analyze@v3
 ```
 
-Result: Semgrep catches patterns fast, CodeQL catches deep vulnerabilities, AI catches logic/review issues. All three post inline comments on the same PR diff.
+### Conversational `@ai-reviewer`
 
-### Rate limiting
+Create `.github/workflows/conversation.yml` to enable `@ai-reviewer` replies on any PR comment.
 
-If you hit API rate limits (429 responses), lower the parallelism:
+### Learning from feedback
 
-```yaml
-max_concurrency: 2   # or 1 for strict serial
-```
+Create `.github/workflows/learn.yml` to record dismissed patterns and avoid repeating false positives.
 
-## How it works
-
-```mermaid
-flowchart LR
-    PR[PR opened] --> Cache{Commit cached?}
-    Cache -->|no| Diff[Analyze diff]
-    Cache -->|yes| Post[Post from cache]
-    Diff --> Chunks[Split into chunks]
-    Chunks --> Pass1[AI Pass 1<br/>Detect issues]
-    Pass1 --> Pass2[AI Pass 2<br/>Validate & deduplicate]
-    Pass2 --> Semgrep{Semgrep<br/>enabled?}
-    Semgrep -->|yes| Merge[Merge static<br/>analysis results]
-    Semgrep -->|no| Score[Risk scoring]
-    Merge --> Score
-    Score --> Post
-```
-
-## Running tests
+## Running locally
 
 ```bash
 npm install
 npm test   # 21 tests, <1s
 ```
 
-## Tags & versioning
+## Versioning
 
 ```yaml
 uses: imtiyaazsalie/ai-pr-reviewer-template@v1    # pinned major (recommended)
 uses: imtiyaazsalie/ai-pr-reviewer-template@main   # latest commit
 ```
+
+## License
+
+MIT — free for any use, including commercial.

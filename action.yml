@@ -129,7 +129,7 @@ runs:
       shell: bash
       run: |
         pip3 install semgrep --quiet 2>/dev/null
-        semgrep scan --config auto --json -o semgrep-results.json --quiet 2>/dev/null || true
+        semgrep scan . --config auto --json -o semgrep-results.json || true
         echo "✅ Semgrep complete"
 
     - name: Merge Semgrep results

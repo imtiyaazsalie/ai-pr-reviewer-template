@@ -61,13 +61,13 @@ Runs first — catches what AI would miss or be wrong about:
 
 | Tool | Catches | Cost |
 |---|---|---|
-| **Semgrep** | Code bugs, security patterns, correctness issues, hardcoded secrets | Free |
-| **Trivy** | Secrets in config files, dependency vulns, Docker/infra misconfigs | Free |
-| **OSV-Scanner** | Known CVEs in dependencies (npm, pip, gem, cargo, etc.) | Free |
+| **MegaLinter** | 50+ linters: style, formatting, language-specific bugs (ESLint, PHPStan, Rubocop, Pylint, etc.) | Free, unlimited |
+| **Trivy** | Secrets in config files, dependency vulns, Docker/infra misconfigs | Free, unlimited |
+| **OSV-Scanner** | Known CVEs in dependencies (npm, pip, gem, cargo, etc.) | Free, unlimited |
 
-All three run in ~30 seconds. Results are merged into the review alongside AI findings. Toggle any off: `enable_semgrep: false`, `enable_trivy: false`, `enable_osv_scanner: false`.
+All three run in ~45 seconds. Results are merged into the review alongside AI findings. Toggle any off: `enable_megalinter: false`, `enable_trivy: false`, `enable_osv_scanner: false`.
 
-### AI review (smart, handles ambiguity)
+> **Why MegaLinter instead of Semgrep?** Semgrep's free tier is rate‑limited (~100 scans/month). MegaLinter is fully unlimited, runs offline, and covers 50+ languages with dedicated linters — ESLint for JS, PHPStan for PHP, Rubocop for Ruby, Pylint for Python, and more. Semgrep is still available as an optional toggle.
 
 The AI receives the deterministic results and focuses **only** on:
 - Logic errors and design issues

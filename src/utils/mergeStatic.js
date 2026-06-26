@@ -6,6 +6,7 @@ const results = {
   osv: [],
   total: 0,
   sources: [],
+  megalinter: [],
 };
 
 // --- Parse Semgrep ---
@@ -20,6 +21,45 @@ try {
     category: "static_analysis",
   }));
   if (results.semgrep.length) results.sources.push("semgrep");
+} catch (e) {}
+
+// --- Parse MegaLinter (SARIF) ---
+try {
+  const allSarifFiles = [];
+  const reportsDir = "megalinter-reports";
+  if (fs.existsSync(reportsDir)) {
+    const dirFiles = fs
+      .readdirSync(reportsDir)
+      .filter((f) => f.endsWith(".sarif"))
+      .map((f) => `${reportsDir}/${f}`);
+    allSarifFiles.push(...dirFiles);
+  }
+  const rootSarif = fs.readdirSync(".").filter((f) => f.endsWith(".sarif"));
+  allSarifFiles.push(...rootSarif);
+  for (const sarifFile of [...new Set(allSarifFiles)].slice(0, 5)) {
+    try {
+      const sarif = JSON.parse(fs.readFileSync(sarifFile, "utf8"));
+      for (const run of sarif.runs || []) {
+        const toolName = run.tool?.driver?.name || "megalinter";
+        for (const result of run.results || []) {
+          const location = result.locations?.[0]?.physicalLocation;
+          results.megalinter.push({
+            file: location?.artifactLocation?.uri || "unknown",
+            line: location?.region?.startLine,
+            severity: result.level === "error" ? "warning" : "suggestion",
+            message:
+              `${toolName}: ${result.ruleId || ""} — ${result.message?.text || ""}`.slice(
+                0,
+                200,
+              ),
+            source: "megalinter",
+            category: "code_quality",
+          });
+        }
+      }
+    } catch (e) {}
+  }
+  if (results.megalinter.length) results.sources.push("megalinter");
 } catch (e) {}
 
 // --- Parse Trivy ---
@@ -108,7 +148,12 @@ try {
 } catch (e) {}
 
 // --- Merge all deterministic issues ---
-const allIssues = [...results.semgrep, ...results.trivy, ...results.osv];
+const allIssues = [
+  ...results.semgrep,
+  ...results.megalinter,
+  ...results.trivy,
+  ...results.osv,
+];
 const seen = new Set();
 const deduped = allIssues.filter((item) => {
   const key = `${item.file}|${item.line}|${item.source}|${item.message.slice(0, 40)}`;
@@ -136,6 +181,7 @@ const summary = {
   sources: results.sources,
   total_issues: deduped.length,
   categories: {
+    code_quality: deduped.filter((d) => d.category === "code_quality").length,
     secrets: deduped.filter((d) => d.category === "secret").length,
     static_analysis: deduped.filter((d) => d.category === "static_analysis")
       .length,
@@ -157,6 +203,6 @@ fs.writeFileSync(
 );
 console.log(
   `📊 Deterministic pipeline: ${results.sources.join(" + ")} → ${deduped.length} issues ` +
-    `(secrets: ${summary.categories.secrets}, static: ${summary.categories.static_analysis}, ` +
+    `(quality: ${summary.categories.code_quality}, secrets: ${summary.categories.secrets}, static: ${summary.categories.static_analysis}, ` +
     `deps: ${summary.categories.dependency}, infra: ${summary.categories.infra})`,
 );

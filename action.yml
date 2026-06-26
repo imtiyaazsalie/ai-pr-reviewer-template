@@ -43,7 +43,11 @@ inputs:
     required: false
     default: "standard"
   enable_semgrep:
-    description: "Run Semgrep static analysis alongside AI review"
+    description: "Run Semgrep static analysis (limited free tier; MegaLinter recommended instead)"
+    required: false
+    default: "false"
+  enable_megalinter:
+    description: "Run MegaLinter — 50+ linters for style, bugs, and code quality (free, unlimited)"
     required: false
     default: "true"
   enable_trivy:
@@ -164,8 +168,6 @@ runs:
       shell: bash
       run: |
         pip3 install semgrep --quiet 2>/dev/null
-        # p/ci covers: correctness, security, best practices, common bugs
-        # p/secrets covers: hardcoded credentials, tokens, keys
         semgrep scan . \
           --config p/ci \
           --config p/secrets \
@@ -173,6 +175,17 @@ runs:
           --json -o semgrep-results.json || true
         count=$(cat semgrep-results.json | python3 -c "import json,sys; print(len(json.load(sys.stdin).get('results',[])))" 2>/dev/null || echo 0)
         echo "✅ Semgrep: ${count} issues found"
+
+    - name: MegaLinter — style, bugs, code quality (50+ linters)
+      if: steps.cache_check.outcome != 'success' && inputs.enable_megalinter == 'true'
+      continue-on-error: true
+      uses: oxsecurity/megalinter/flavors/ci_light@v8
+      env:
+        VALIDATE_ALL_CODEBASE: false
+        PRINT_ALPACA: false
+        SARIF_REPORTER: true
+        DISABLE_ERRORS: true
+        DISABLE: COPYPASTE,SPELL
 
     - name: Trivy — secrets + dependencies + misconfigs
       if: steps.cache_check.outcome != 'success' && inputs.enable_trivy == 'true'

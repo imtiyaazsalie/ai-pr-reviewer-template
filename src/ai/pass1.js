@@ -75,22 +75,12 @@ function getInstructionsForFile(filePath, config) {
   const prContext = loadPRContext();
   const config = loadConfig();
   const fileMeta = loadFileMeta();
-  const learning = loadLearning();
-  const detSummary = loadDeterministicSummary();
   const chunks = JSON.parse(fs.readFileSync("chunks.json", "utf8"));
 
   // Load codebase index for global context
   let codebaseIndex = { index: {}, total_signatures: 0 };
-  let gitContext = {
-    recent_commits: "",
-    high_churn_files: "",
-    recent_authors: "",
-  };
   try {
     codebaseIndex = JSON.parse(fs.readFileSync("codebase-index.json", "utf8"));
-  } catch (e) {}
-  try {
-    gitContext = JSON.parse(fs.readFileSync("git-context.json", "utf8"));
   } catch (e) {}
 
   // Build relevant codebase context for changed files
@@ -106,46 +96,8 @@ function getInstructionsForFile(filePath, config) {
     .slice(0, 15);
   const codebaseBlock =
     relevantFiles.length > 0
-      ? `\n## Codebase context (functions/classes near changed files)\n${relevantFiles.map(([f, sigs]) => `**${f}**:\n${sigs.slice(0, 10).join("\n")}`).join("\n\n")}`
+      ? `\n## Codebase context\n${relevantFiles.map(([f, sigs]) => `**${f}**:\n${sigs.slice(0, 10).join("\n")}`).join("\n\n")}`
       : "";
-
-  const gitBlock =
-    gitContext?.recent_commits && gitContext.recent_commits !== "N/A"
-      ? `\n## Git history\n### Recent commits on this branch:\n${gitContext.recent_commits}\n### High-churn files (frequently changed):\n${gitContext.high_churn_files}`
-      : "";
-
-  // Deterministic pipeline already caught these — tell AI to skip
-  const detBlock = detSummary?.total_issues
-    ? [
-        `\n## Deterministic pipeline already found (do NOT re-flag these categories)`,
-        `Tools: ${(detSummary.sources || []).join(" + ")}`,
-        `Secrets: ${detSummary.categories?.secrets || 0} | Static analysis: ${detSummary.categories?.static_analysis || 0} | Dependencies: ${detSummary.categories?.dependency || 0} | Infra: ${detSummary.categories?.infra || 0}`,
-        `Top findings already caught:`,
-        ...(detSummary.top_issues || []).map(
-          (i) => `  - [${i.source}] ${i.file}: ${i.message}`,
-        ),
-        `\nFocus ONLY on: logic errors, design issues, PR-level architectural concerns,`,
-        `edge cases the deterministic tools can't catch.`,
-        `SKIP: secrets, dependency vulns, style, formatting, pattern-based bugs.`,
-      ].join("\n")
-    : "";
-
-  const linkedIssuesBlock = prContext?.linked_issues?.length
-    ? `\n## Linked Issues\n${prContext.linked_issues.map((i) => `- #${i.number}: ${i.title} [${(i.labels || []).join(", ")}]`).join("\n")}`
-    : "";
-
-  const learningBlock = learning?.dismissed_patterns?.length
-    ? `\n## Team Learning (previously dismissed patterns — do NOT re-flag these)\n${learning.dismissed_patterns.map((p) => `- File pattern: ${p.file_pattern || "*"}, Issue pattern: "${p.issue_pattern}"`).join("\n")}`
-    : "";
-
-  const suppressedForFile = (learning?.suppressed_files || []).filter((s) => {
-    return chunks.some((c) =>
-      c.file.match(new RegExp(s.file_pattern.replace(/\*/g, ".*"))),
-    );
-  });
-  const suppressedBlock = suppressedForFile.length
-    ? `\n## Previously Suppressed (these files had issues the team dismissed)\n${suppressedForFile.map((s) => `- ${s.file_pattern}: "${s.note}"`).join("\n")}`
-    : "";
 
   const prContextBlock = prContext?.title
     ? [
@@ -169,20 +121,16 @@ function getInstructionsForFile(filePath, config) {
         const meta = fileMeta[chunk.file] || {};
         const dirInstructions = getInstructionsForFile(chunk.file, config);
 
+        // Only the essentials: what is this PR, what code exists nearby, here is the diff
         const userPrompt = [
-          detBlock,
           prContextBlock,
-          linkedIssuesBlock,
-          gitBlock,
           codebaseBlock,
-          learningBlock,
-          suppressedBlock,
-          `## File: ${chunk.file}${meta.is_test ? " (test file — flag missing assertions, not helper structure)" : ""}`,
-          dirInstructions,
           chunk.cross_refs
-            ? `\n## Cross-file references (API contracts — flag breaking changes):\n${chunk.cross_refs}`
+            ? `\n## Cross-file references:\n${chunk.cross_refs}`
             : "",
-          `\n## Diff hunk:`,
+          `## File: ${chunk.file}${meta.is_test ? " (test)" : ""}`,
+          dirInstructions,
+          `\n## Diff:`,
           chunk.content,
         ]
           .filter(Boolean)

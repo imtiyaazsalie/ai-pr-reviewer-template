@@ -40,6 +40,14 @@ function loadLearning() {
   }
 }
 
+function loadDeterministicSummary() {
+  try {
+    return JSON.parse(fs.readFileSync("deterministic-summary.json", "utf8"));
+  } catch (e) {
+    return null;
+  }
+}
+
 function loadFileMeta() {
   try {
     return JSON.parse(fs.readFileSync("file-meta.json", "utf8"));
@@ -68,7 +76,24 @@ function getInstructionsForFile(filePath, config) {
   const config = loadConfig();
   const fileMeta = loadFileMeta();
   const learning = loadLearning();
+  const detSummary = loadDeterministicSummary();
   const chunks = JSON.parse(fs.readFileSync("chunks.json", "utf8"));
+
+  // Deterministic pipeline already caught these — tell AI to skip
+  const detBlock = detSummary?.total_issues
+    ? [
+        `\n## Deterministic pipeline already found (do NOT re-flag these categories)`,
+        `Tools: ${(detSummary.sources || []).join(" + ")}`,
+        `Secrets: ${detSummary.categories?.secrets || 0} | Static analysis: ${detSummary.categories?.static_analysis || 0} | Dependencies: ${detSummary.categories?.dependency || 0} | Infra: ${detSummary.categories?.infra || 0}`,
+        `Top findings already caught:`,
+        ...(detSummary.top_issues || []).map(
+          (i) => `  - [${i.source}] ${i.file}: ${i.message}`,
+        ),
+        `\nFocus ONLY on: logic errors, design issues, PR-level architectural concerns,`,
+        `edge cases the deterministic tools can't catch.`,
+        `SKIP: secrets, dependency vulns, style, formatting, pattern-based bugs.`,
+      ].join("\n")
+    : "";
 
   const linkedIssuesBlock = prContext?.linked_issues?.length
     ? `\n## Linked Issues\n${prContext.linked_issues.map((i) => `- #${i.number}: ${i.title} [${(i.labels || []).join(", ")}]`).join("\n")}`
@@ -110,6 +135,7 @@ function getInstructionsForFile(filePath, config) {
         const dirInstructions = getInstructionsForFile(chunk.file, config);
 
         const userPrompt = [
+          detBlock,
           prContextBlock,
           linkedIssuesBlock,
           learningBlock,

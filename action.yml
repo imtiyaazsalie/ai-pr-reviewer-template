@@ -45,7 +45,15 @@ inputs:
   enable_semgrep:
     description: "Run Semgrep static analysis alongside AI review"
     required: false
-    default: "false"
+    default: "true"
+  enable_trivy:
+    description: "Run Trivy for secrets, dependencies, and infrastructure vulns"
+    required: false
+    default: "true"
+  enable_osv_scanner:
+    description: "Run OSV-Scanner for dependency vulnerability checks"
+    required: false
+    default: "true"
 
 runs:
   using: "composite"
@@ -159,8 +167,27 @@ runs:
         semgrep scan . --config auto --json -o semgrep-results.json || true
         echo "✅ Semgrep complete"
 
-    - name: Merge Semgrep results
-      if: steps.cache_check.outcome != 'success' && inputs.enable_semgrep == 'true'
+    - name: Trivy — secrets + dependencies + misconfigs
+      if: steps.cache_check.outcome != 'success' && inputs.enable_trivy == 'true'
+      continue-on-error: true
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: fs
+        scanners: secret,vuln,misconfig
+        format: json
+        output: trivy-results.json
+
+    - name: OSV-Scanner — dependency CVEs
+      if: steps.cache_check.outcome != 'success' && inputs.enable_osv_scanner == 'true'
+      continue-on-error: true
+      shell: bash
+      run: |
+        npm install -g osv-scanner 2>/dev/null || true
+        osv-scanner --format json --output osv-results.json . || true
+        echo "✅ OSV-Scanner complete"
+
+    - name: Merge all deterministic results
+      if: steps.cache_check.outcome != 'success'
       shell: bash
       run: node ${{ github.action_path }}/src/utils/mergeStatic.js
       continue-on-error: true

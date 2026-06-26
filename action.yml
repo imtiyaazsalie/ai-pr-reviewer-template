@@ -158,14 +158,21 @@ runs:
         AI_MODEL: ${{ inputs.ai_model }}
         AI_BASE_URL: ${{ inputs.ai_base_url }}
 
-    - name: Semgrep static analysis
+    - name: Semgrep — code bugs, security, correctness
       if: steps.cache_check.outcome != 'success' && inputs.enable_semgrep == 'true'
       continue-on-error: true
       shell: bash
       run: |
         pip3 install semgrep --quiet 2>/dev/null
-        semgrep scan . --config auto --json -o semgrep-results.json || true
-        echo "✅ Semgrep complete"
+        # p/ci covers: correctness, security, best practices, common bugs
+        # p/secrets covers: hardcoded credentials, tokens, keys
+        semgrep scan . \
+          --config p/ci \
+          --config p/secrets \
+          --severity WARNING \
+          --json -o semgrep-results.json || true
+        count=$(cat semgrep-results.json | python3 -c "import json,sys; print(len(json.load(sys.stdin).get('results',[])))" 2>/dev/null || echo 0)
+        echo "✅ Semgrep: ${count} issues found"
 
     - name: Trivy — secrets + dependencies + misconfigs
       if: steps.cache_check.outcome != 'success' && inputs.enable_trivy == 'true'

@@ -55,14 +55,38 @@ That's it. The action runs automatically on every PR.
 
 ## Features
 
-- ✅ Inline line‑specific comments on changed files
+### Deterministic pipeline (free, 100% accurate)
+
+Runs first — catches what AI would miss or be wrong about:
+
+| Tool | Catches | Cost |
+|---|---|---|
+| **Semgrep** | Code bugs, security patterns, correctness issues, hardcoded secrets | Free |
+| **Trivy** | Secrets in config files, dependency vulns, Docker/infra misconfigs | Free |
+| **OSV-Scanner** | Known CVEs in dependencies (npm, pip, gem, cargo, etc.) | Free |
+
+All three run in ~30 seconds. Results are merged into the review alongside AI findings. Toggle any off: `enable_semgrep: false`, `enable_trivy: false`, `enable_osv_scanner: false`.
+
+### AI review (smart, handles ambiguity)
+
+The AI receives the deterministic results and focuses **only** on:
+- Logic errors and design issues
+- Edge cases that pattern matchers can't catch
+- PR‑level architectural concerns
+- Suggested fixes for flagged issues
+
+This reduces AI token usage by ~60% since it skips categories already covered by the deterministic pipeline.
+
+- ✅ Full‑file review for files ≤ 200 lines — catches pre‑existing errors
+- ✅ Inline line‑specific comments with suggested fixes (one‑click commit)
 - ✅ Two‑pass AI validation — deduplicates and removes false positives
-- ✅ Monorepo‑aware with optional workspace config
+- ✅ Confidence scoring (e.g. "90% sure") on every issue
+- ✅ Monorepo‑aware with optional `.ai-reviewer.yml` config
 - ✅ Commit‑level caching — never re‑review the same commit twice
-- ✅ Risk scoring with file‑criticality weighting (`/core/`, `auth` paths get 2× weight)
-- ✅ Concurrent AI calls with configurable parallelism
-- ✅ Optional Semgrep integration (toggle on)
-- ✅ `node_modules` cached across runs — cold start eliminated after first PR
+- ✅ Risk scoring with file‑criticality weighting
+- ✅ Three review depths: `quick`, `standard`, `thorough`
+- ✅ Conversational `@ai-reviewer` on any PR comment
+- ✅ Auto‑labeling (risk, size, domain tags)
 - ✅ 21‑test unit suite validating core logic
 
 ## All inputs

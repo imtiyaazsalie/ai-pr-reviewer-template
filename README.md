@@ -167,7 +167,14 @@ Without a config, the action auto‑filters out lockfiles, `dist/`, `node_module
 
 ### Semgrep integration
 
-Set `enable_semgrep: true` — the action runs Semgrep with `config: auto` and merges findings into the AI review, deduplicating overlapping issues.
+Set `enable_semgrep: true`. The action automatically:
+
+1. Installs Semgrep via `pip3`
+2. Runs `semgrep scan --config auto` against your repo
+3. Converts the findings (ERROR → blocker, else → warning)
+4. **Merges** them with the AI review, deduplicating overlapping issues
+
+That's it — no extra configuration, no external artifacts.
 
 ### Rate limiting
 

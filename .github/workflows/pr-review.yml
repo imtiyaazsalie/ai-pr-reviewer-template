@@ -12,6 +12,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: imtiyaazsalie/ai-pr-reviewer-template@main
+      - uses: imtiyaazsalie/ai-pr-reviewer-template@v1
         with:
-          deepseek_api_key: ${{ secrets.DEEPSEEK_API_KEY }}
+          ai_provider: deepseek
+          ai_api_key: ${{ secrets.DEEPSEEK_API_KEY }}

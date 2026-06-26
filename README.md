@@ -1,6 +1,6 @@
 # AI PR Reviewer with DeepSeek
 
-This GitHub Action automatically reviews pull requests using DeepSeek AI. It posts **inline comments** and a **summary** — like CodeRabbit — but runs entirely on GitHub's infrastructure.
+This GitHub Action automatically reviews pull requests using AI (DeepSeek, OpenAI, Anthropic, Groq, or any OpenAI‑compatible endpoint). It posts **inline comments** and a **summary** — like CodeRabbit — but runs entirely on GitHub's infrastructure.
 
 ## Zero‑Conflict Setup
 
@@ -28,18 +28,19 @@ jobs:
     steps:
       - uses: imtiyaazsalie/ai-pr-reviewer-template@v1
         with:
-          deepseek_api_key: ${{ secrets.DEEPSEEK_API_KEY }}
+          ai_provider: deepseek
+          ai_api_key: ${{ secrets.AI_API_KEY }}
 ```
 
 That's the only file you need. The default `GITHUB_TOKEN` is used automatically for posting comments — no extra secret required.
 
-### 2. Add your DeepSeek API key
+### 2. Add your AI API key
 
 Go to **Settings → Secrets and variables → Actions** in your repo and add:
 
 | Secret | Value |
 |---|---|
-| `DEEPSEEK_API_KEY` | Your [DeepSeek API key](https://platform.deepseek.com/api_keys) |
+| `AI_API_KEY` | Your provider's API key |
 
 That's it. The action runs automatically on every PR.
 
@@ -66,20 +67,81 @@ That's it. The action runs automatically on every PR.
 
 ## All inputs
 
+### AI provider
+
 | Input | Required | Default | Description |
 |---|---|---|---|
-| `deepseek_api_key` | ✅ Yes | — | Your DeepSeek API key |
+| `ai_provider` | No | `deepseek` | `deepseek`, `openai`, `anthropic`, `groq`, or `ollama` |
+| `ai_api_key` | Yes¹ | — | API key for the chosen provider |
+| `ai_model` | No | provider default | Override the model (e.g. `gpt-4o`, `claude-3-5-sonnet`) |
+| `ai_base_url` | No | provider default | Custom endpoint (for self‑hosted, proxies, or any OpenAI‑compatible API) |
+| `deepseek_api_key` | No² | — | Legacy input; use `ai_api_key` instead |
+
+> ¹ Not required for `ollama`.  
+> ² Exists for backwards compatibility. Falls back to `ai_api_key`.
+
+### Other inputs
+
+| Input | Required | Default | Description |
+|---|---|---|---|
 | `github_token` | No | `${{ github.token }}` | Token for posting PR comments |
 | `enable_semgrep` | No | `false` | Run Semgrep static analysis alongside AI review |
 | `max_concurrency` | No | `5` | Max concurrent AI calls (lower if hitting rate limits) |
 | `config_path` | No | `""` | Path to monorepo config (e.g. `.github/ai-reviewer.yml`) |
+
+### Provider examples
+
+**OpenAI**
+```yaml
+- uses: imtiyaazsalie/ai-pr-reviewer-template@v1
+  with:
+    ai_provider: openai
+    ai_api_key: ${{ secrets.OPENAI_API_KEY }}
+    ai_model: gpt-4o-mini
+```
+
+**Anthropic (Claude)**
+```yaml
+- uses: imtiyaazsalie/ai-pr-reviewer-template@v1
+  with:
+    ai_provider: anthropic
+    ai_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+**Groq**
+```yaml
+- uses: imtiyaazsalie/ai-pr-reviewer-template@v1
+  with:
+    ai_provider: groq
+    ai_api_key: ${{ secrets.GROQ_API_KEY }}
+    max_concurrency: 2
+```
+
+**Ollama (local, free)**
+```yaml
+- uses: imtiyaazsalie/ai-pr-reviewer-template@v1
+  with:
+    ai_provider: ollama
+    ai_model: llama3.1
+```
+
+**Any OpenAI-compatible endpoint**
+```yaml
+- uses: imtiyaazsalie/ai-pr-reviewer-template@v1
+  with:
+    ai_base_url: https://your-api.company.com/v1/chat/completions
+    ai_model: your-model
+    ai_api_key: ${{ secrets.CUSTOM_API_KEY }}
+```
 
 ### Full example with all options
 
 ```yaml
 - uses: imtiyaazsalie/ai-pr-reviewer-template@v1
   with:
-    deepseek_api_key: ${{ secrets.DEEPSEEK_API_KEY }}
+    ai_provider: anthropic
+    ai_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+    ai_model: claude-3-5-sonnet-latest
     enable_semgrep: true
     max_concurrency: 3
     config_path: .github/ai-reviewer.yml

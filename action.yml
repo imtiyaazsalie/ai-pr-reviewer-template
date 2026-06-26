@@ -3,9 +3,29 @@ description: "Automatically review pull requests using DeepSeek AI with inline c
 author: "imtiyaazsalie"
 
 inputs:
+  # --- AI provider (generic) ---
+  ai_provider:
+    description: "AI provider: deepseek, openai, anthropic, groq, ollama (default: deepseek)"
+    required: false
+    default: "deepseek"
+  ai_api_key:
+    description: "API key for the AI provider (falls back to deepseek_api_key)"
+    required: false
+    default: ""
+  ai_model:
+    description: "Model name (defaults to provider-specific value if unset)"
+    required: false
+    default: ""
+  ai_base_url:
+    description: "Custom API endpoint (overrides provider default)"
+    required: false
+    default: ""
+  # --- Backwards-compatible DeepSeek input ---
   deepseek_api_key:
-    description: "DeepSeek API key"
-    required: true
+    description: "Deprecated. Use ai_api_key + ai_provider instead."
+    required: false
+    default: ""
+  # --- Other inputs ---
   github_token:
     description: "GitHub token for posting comments (defaults to secrets.GITHUB_TOKEN)"
     required: false
@@ -81,7 +101,11 @@ runs:
           echo '⚠️ Pass 1 failed — continuing with empty results'
         }
       env:
+        AI_PROVIDER: ${{ inputs.ai_provider }}
+        AI_API_KEY: ${{ inputs.ai_api_key }}
         DEEPSEEK_API_KEY: ${{ inputs.deepseek_api_key }}
+        AI_MODEL: ${{ inputs.ai_model }}
+        AI_BASE_URL: ${{ inputs.ai_base_url }}
         MAX_CONCURRENCY: ${{ inputs.max_concurrency }}
 
     - name: AI Pass 2 (validate & deduplicate)
@@ -93,7 +117,11 @@ runs:
           echo '⚠️ Pass 2 failed — continuing with empty results'
         }
       env:
+        AI_PROVIDER: ${{ inputs.ai_provider }}
+        AI_API_KEY: ${{ inputs.ai_api_key }}
         DEEPSEEK_API_KEY: ${{ inputs.deepseek_api_key }}
+        AI_MODEL: ${{ inputs.ai_model }}
+        AI_BASE_URL: ${{ inputs.ai_base_url }}
 
     - name: Semgrep static analysis
       if: steps.cache_check.outcome != 'success' && inputs.enable_semgrep == 'true'

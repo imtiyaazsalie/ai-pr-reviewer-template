@@ -10,31 +10,50 @@ if (!pullNumber) {
   process.exit(1);
 }
 
+function loadPRContext() {
+  try {
+    return JSON.parse(fs.readFileSync("pr-context.json", "utf8"));
+  } catch (e) {
+    return null;
+  }
+}
+
 (async () => {
   const risk = JSON.parse(fs.readFileSync("risk.json", "utf8"));
   const issues = JSON.parse(fs.readFileSync("final.review.json", "utf8"));
+  const prContext = loadPRContext();
 
-  let issueList =
-    issues.length === 0
-      ? "✅ No critical issues found."
-      : issues
-          .map(
-            (i) =>
-              `- **${i.severity || "info"}** (${i.file || "unknown"}#L${i.line || "?"}): ${i.message}`,
-          )
-          .join("\n");
+  const blockers = issues.filter((i) => i.severity === "blocker");
+  const warnings = issues.filter((i) => i.severity === "warning");
+  const suggestions = issues.filter((i) => i.severity === "suggestion");
+  const withFixes = issues.filter(
+    (i) => i.suggestion && i.suggestion !== "null",
+  );
 
-  const body = `
-## 🤖 AI Code Review Summary
+  const riskEmoji =
+    risk.level === "HIGH" ? "🔴" : risk.level === "MEDIUM" ? "🟡" : "🟢";
 
-**Risk Level**: ${risk.level} (score: ${risk.score})
+  const body = `## 🤖 AI Code Review
 
-### Issues Detected
-${issueList}
+${prContext?.title ? `**PR**: ${prContext.title}\n` : ""}
+${riskEmoji} **Risk**: ${risk.level} (score: ${risk.score}) | **Files**: ${prContext?.files_changed || "?"} | +${prContext?.additions || "?"}/-${prContext?.deletions || "?"}
+
+${
+  issues.length === 0
+    ? "### ✅ No issues found\n\nNo blockers, warnings, or suggestions detected."
+    : `### Issues (${issues.length})
+| Severity | Count |
+|---|---|
+${blockers.length ? `| 🔴 Blocker | ${blockers.length} |\n` : ""}${warnings.length ? `| 🟡 Warning | ${warnings.length} |\n` : ""}${suggestions.length ? `| 🔵 Suggestion | ${suggestions.length} |` : ""}
+
+${withFixes.length > 0 ? `\n💡 ${withFixes.length} issue(s) include suggested fixes — click **Commit suggestion** on the inline comments.\n` : ""}
+
+${blockers.length ? `\n#### 🔴 Blockers\n${blockers.map((i) => `- **\`${i.file || "?"}#L${i.line || "?"}\`**: ${i.message}`).join("\n")}\n` : ""}
+${warnings.length ? `\n#### 🟡 Warnings\n${warnings.map((i) => `- **\`${i.file || "?"}#L${i.line || "?"}\`**: ${i.message}`).join("\n")}\n` : ""}`
+}
 
 ---
-*Generated automatically using DeepSeek AI.*
-`;
+<sub>Generated automatically. [Configurable](https://github.com/imtiyaazsalie/ai-pr-reviewer-template)</sub>`;
 
   try {
     await octokit.issues.createComment({

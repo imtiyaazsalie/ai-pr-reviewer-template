@@ -24,6 +24,18 @@ function loadCache() {
       JSON.stringify(data.finalReview, null, 2),
     );
     fs.writeFileSync("risk.json", JSON.stringify(data.risk, null, 2));
+    if (data.prContext) {
+      fs.writeFileSync(
+        "pr-context.json",
+        JSON.stringify(data.prContext, null, 2),
+      );
+    }
+    if (data.fileMeta) {
+      fs.writeFileSync(
+        "file-meta.json",
+        JSON.stringify(data.fileMeta, null, 2),
+      );
+    }
     return true;
   }
   return false;
@@ -32,8 +44,19 @@ function loadCache() {
 function saveCache() {
   const finalReview = JSON.parse(fs.readFileSync("final.review.json", "utf8"));
   const risk = JSON.parse(fs.readFileSync("risk.json", "utf8"));
+  let prContext = null;
+  let fileMeta = null;
+  try {
+    prContext = JSON.parse(fs.readFileSync("pr-context.json", "utf8"));
+  } catch (e) {}
+  try {
+    fileMeta = JSON.parse(fs.readFileSync("file-meta.json", "utf8"));
+  } catch (e) {}
   const file = path.join(CACHE_DIR, `${getCacheKey()}.json`);
-  fs.writeFileSync(file, JSON.stringify({ finalReview, risk }, null, 2));
+  fs.writeFileSync(
+    file,
+    JSON.stringify({ finalReview, risk, prContext, fileMeta }, null, 2),
+  );
   console.log("✅ Cache saved");
 }
 

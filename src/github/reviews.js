@@ -19,7 +19,11 @@ function formatComment(issue) {
       suggestion: "🔵 Suggestion",
     }[issue.severity] || "📝 Note";
 
-  const parts = [`**${label}**: ${issue.message}`];
+  const parts = [
+    `**${label}${
+      issue.confidence ? ` (${Math.round(issue.confidence * 100)}% sure)` : ""
+    }**: ${issue.message}`,
+  ];
 
   // Add suggested fix if available
   if (

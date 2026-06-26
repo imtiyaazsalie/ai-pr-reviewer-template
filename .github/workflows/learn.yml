@@ -1,0 +1,31 @@
+name: AI Reviewer — Learn from Feedback
+
+on:
+  pull_request_review:
+    types: [submitted, dismissed]
+
+jobs:
+  learn:
+    if: |
+      github.event.review.user.type == 'Bot' ||
+      github.event.review.state == 'dismissed'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: imtiyaazsalie/ai-pr-reviewer-template@v1
+        with:
+          ai_provider: deepseek
+          ai_api_key: ${{ secrets.AI_API_KEY }}
+
+      - name: Update learning data
+        shell: bash
+        run: node ${{ github.action_path }}/src/github/learn.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEW_STATE: ${{ github.event.review.state }}

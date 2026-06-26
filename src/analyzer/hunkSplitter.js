@@ -27,6 +27,103 @@ function getSurroundingContext(filePath, hunkStartLine) {
   }
 }
 
+// Extract cross-file references (imports, requires, includes)
+function extractCrossRefs(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) return "";
+    const content = fs.readFileSync(filePath, "utf8");
+    const references = [];
+
+    // JS/TS imports
+    const jsImports = content.matchAll(
+      /(?:import|require)\s*\(?\s*['"]([^'"]+)['"]/g,
+    );
+    for (const m of jsImports) {
+      const ref = resolveRefPath(filePath, m[1]);
+      if (ref && ref !== filePath) references.push(ref);
+    }
+
+    // Python imports
+    const pyImports = content.matchAll(/(?:from|import)\s+([\w.]+)/g);
+    for (const m of pyImports) {
+      const refPath = m[1].replace(/\./g, "/") + ".py";
+      if (fs.existsSync(refPath)) references.push(refPath);
+    }
+
+    // Ruby requires
+    const rubyRequires = content.matchAll(/require\s+['"]([^'"]+)['"]/g);
+    for (const m of rubyRequires) {
+      const ref = m[1] + ".rb";
+      if (fs.existsSync(ref) && ref !== filePath) references.push(ref);
+    }
+
+    // PHP use/require
+    const phpRequires = content.matchAll(
+      /(?:use|require(?:_once)?|include(?:_once)?)\s+['"]?([^;'"\s]+)/g,
+    );
+    for (const m of phpRequires) {
+      const ref = m[1] + ".php";
+      if (fs.existsSync(ref) && ref !== filePath) references.push(ref);
+    }
+
+    if (!references.length) return "";
+
+    // Read the public API of referenced files
+    const refsInfo = [];
+    for (const ref of [...new Set(references)].slice(0, 3)) {
+      try {
+        const refContent = fs.readFileSync(ref, "utf8");
+        // Extract function signatures, class names, exports
+        const signatures = [];
+        const funcMatches = refContent.matchAll(
+          /(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\([^)]*\)/g,
+        );
+        for (const fm of funcMatches)
+          signatures.push(`  function ${fm[1]}(...)`);
+        const classMatches = refContent.matchAll(
+          /(?:export\s+)?class\s+(\w+)/g,
+        );
+        for (const cm of classMatches) signatures.push(`  class ${cm[1]}`);
+        const constMatches = refContent.matchAll(
+          /(?:export\s+)?const\s+(\w+)\s*=/g,
+        );
+        for (const km of constMatches) signatures.push(`  const ${km[1]}`);
+
+        if (signatures.length) {
+          refsInfo.push(
+            `\n**${ref}** exports:\n${signatures.slice(0, 15).join("\n")}`,
+          );
+        }
+      } catch (e) {}
+    }
+
+    return refsInfo.join("\n");
+  } catch (e) {
+    return "";
+  }
+}
+
+function resolveRefPath(currentFile, importPath) {
+  if (importPath.startsWith(".")) {
+    const dir = require("path").dirname(currentFile);
+    const resolved = require("path").resolve(dir, importPath);
+    // Try common extensions
+    for (const ext of [
+      "",
+      ".js",
+      ".ts",
+      ".jsx",
+      ".tsx",
+      ".mjs",
+      "/index.js",
+      "/index.ts",
+    ]) {
+      if (fs.existsSync(resolved + ext)) return resolved + ext;
+    }
+  }
+  return null;
+}
+
 function parseHunkStartLine(hunkHeader) {
   // Format: @@ -oldStart,oldCount +newStart,newCount @@
   const match = hunkHeader.match(/\+(\d+)(?:,(\d+))?/);
@@ -60,9 +157,16 @@ for (const f of files) {
       }
     }
 
+    // Add cross-file references
+    let crossRefs = "";
+    if (fileName !== "unknown") {
+      crossRefs = extractCrossRefs(fileName);
+    }
+
     chunks.push({
       file: fileName,
       content: chunkContent.slice(0, MAX_CHUNK_SIZE + 2000), // allow context overhead
+      cross_refs: crossRefs || undefined,
     });
   }
 }

@@ -31,6 +31,15 @@ function loadConfig() {
   }
 }
 
+function loadLearning() {
+  try {
+    const data = JSON.parse(fs.readFileSync(".ai-cache/learning.json", "utf8"));
+    return data;
+  } catch (e) {
+    return { dismissed_patterns: [], suppressed_files: [] };
+  }
+}
+
 function loadFileMeta() {
   try {
     return JSON.parse(fs.readFileSync("file-meta.json", "utf8"));
@@ -58,7 +67,25 @@ function getInstructionsForFile(filePath, config) {
   const prContext = loadPRContext();
   const config = loadConfig();
   const fileMeta = loadFileMeta();
+  const learning = loadLearning();
   const chunks = JSON.parse(fs.readFileSync("chunks.json", "utf8"));
+
+  const linkedIssuesBlock = prContext?.linked_issues?.length
+    ? `\n## Linked Issues\n${prContext.linked_issues.map((i) => `- #${i.number}: ${i.title} [${(i.labels || []).join(", ")}]`).join("\n")}`
+    : "";
+
+  const learningBlock = learning?.dismissed_patterns?.length
+    ? `\n## Team Learning (previously dismissed patterns — do NOT re-flag these)\n${learning.dismissed_patterns.map((p) => `- File pattern: ${p.file_pattern || "*"}, Issue pattern: "${p.issue_pattern}"`).join("\n")}`
+    : "";
+
+  const suppressedForFile = (learning?.suppressed_files || []).filter((s) => {
+    return chunks.some((c) =>
+      c.file.match(new RegExp(s.file_pattern.replace(/\*/g, ".*"))),
+    );
+  });
+  const suppressedBlock = suppressedForFile.length
+    ? `\n## Previously Suppressed (these files had issues the team dismissed)\n${suppressedForFile.map((s) => `- ${s.file_pattern}: "${s.note}"`).join("\n")}`
+    : "";
 
   const prContextBlock = prContext?.title
     ? [
@@ -84,8 +111,14 @@ function getInstructionsForFile(filePath, config) {
 
         const userPrompt = [
           prContextBlock,
+          linkedIssuesBlock,
+          learningBlock,
+          suppressedBlock,
           `## File: ${chunk.file}${meta.is_test ? " (test file — flag missing assertions, not helper structure)" : ""}`,
           dirInstructions,
+          chunk.cross_refs
+            ? `\n## Cross-file references (API contracts — flag breaking changes):\n${chunk.cross_refs}`
+            : "",
           `\n## Diff hunk:`,
           chunk.content,
         ]

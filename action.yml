@@ -191,6 +191,14 @@ runs:
         GITHUB_REPOSITORY: ${{ github.repository }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
 
+    - name: Auto-label PR
+      shell: bash
+      run: node ${{ github.action_path }}/src/github/labels.js
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+
     - name: Save cache
       if: steps.cache_check.outcome != 'success'
       shell: bash

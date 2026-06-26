@@ -11,6 +11,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      issues: write
     steps:
       - uses: imtiyaazsalie/ai-pr-reviewer-template@v1
         with:

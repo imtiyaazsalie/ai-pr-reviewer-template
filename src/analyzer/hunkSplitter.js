@@ -266,6 +266,69 @@ for (const f of files) {
   }
 }
 
+// PR Compression: when too many chunks, prioritize high-risk files
+const MAX_CHUNKS = 30;
+if (chunks.length > MAX_CHUNKS) {
+  // Score each chunk's file for risk
+  const riskScore = (fileName) => {
+    let score = 1;
+    if (
+      fileName.includes("auth") ||
+      fileName.includes("security") ||
+      fileName.includes("crypto")
+    )
+      score = 5;
+    else if (
+      fileName.includes("config") ||
+      fileName.includes("env") ||
+      fileName.includes("db")
+    )
+      score = 4;
+    else if (
+      fileName.includes("test") ||
+      fileName.includes("spec") ||
+      fileName.includes("mock")
+    )
+      score = 1;
+    else if (
+      fileName.includes("controller") ||
+      fileName.includes("service") ||
+      fileName.includes("handler")
+    )
+      score = 3;
+    else score = 2;
+    return score;
+  };
+
+  // Sort: highest risk first, newest files first
+  chunks.sort((a, b) => {
+    const riskA = riskScore(a.file);
+    const riskB = riskScore(b.file);
+    if (riskB !== riskA) return riskB - riskA;
+    return a.file.localeCompare(b.file);
+  });
+
+  // Keep top chunks, compress rest to file summaries
+  const kept = chunks.slice(0, MAX_CHUNKS);
+  const compressed = chunks.slice(MAX_CHUNKS);
+
+  // Summarize compressed files
+  const compressedFiles = [...new Set(compressed.map((c) => c.file))];
+  if (compressedFiles.length > 0) {
+    kept.push({
+      file: "COMPRESSED",
+      content: `The following ${compressedFiles.length} lower-priority files were compressed:\n${compressedFiles.map((f) => `- ${f}`).join("\n")}`,
+      cross_refs: undefined,
+    });
+  }
+
+  chunks.length = 0;
+  chunks.push(...kept);
+  console.log(
+    `📦 PR compressed: ${kept.length} chunks kept, ${compressedFiles.length} files compressed`,
+  );
+}
+
 // Log summary
 let smallFileCount = 0;
 let mediumFileCount = 0;

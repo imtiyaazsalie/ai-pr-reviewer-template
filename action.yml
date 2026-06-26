@@ -46,6 +46,10 @@ inputs:
     description: "Run Semgrep static analysis (limited free tier; MegaLinter recommended instead)"
     required: false
     default: "false"
+  enable_improve:
+    description: "Run AI improve pass — suggests refactoring and code quality improvements"
+    required: false
+    default: "true"
   enable_megalinter:
     description: "Run MegaLinter — 50+ linters for style, bugs, and code quality (free, unlimited)"
     required: false
@@ -161,6 +165,21 @@ runs:
         node ${{ github.action_path }}/src/ai/pass2.js || {
           echo '[]' > final.review.json
           echo '⚠️ Pass 2 failed — continuing with empty results'
+        }
+      env:
+        AI_PROVIDER: ${{ inputs.ai_provider }}
+        AI_API_KEY: ${{ inputs.ai_api_key }}
+        DEEPSEEK_API_KEY: ${{ inputs.deepseek_api_key }}
+        AI_MODEL: ${{ inputs.ai_model }}
+        AI_BASE_URL: ${{ inputs.ai_base_url }}
+
+    - name: AI Improve (refactoring suggestions)
+      if: steps.cache_check.outcome != 'success' && inputs.enable_improve == 'true'
+      shell: bash
+      run: |
+        node ${{ github.action_path }}/src/ai/improve.js || {
+          echo '[]' > improve.json
+          echo '⚠️ Improve failed — continuing'
         }
       env:
         AI_PROVIDER: ${{ inputs.ai_provider }}

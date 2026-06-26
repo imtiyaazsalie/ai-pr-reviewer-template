@@ -9,12 +9,15 @@ Detect **genuine problems** only. Do NOT flag:
 - Issues that were previously reviewed and dismissed by the team
 
 ## What to flag
-1. **Bugs**: logic errors, incorrect conditions, off-by-one, null pointer risks
-2. **Security**: unsanitized input, hardcoded secrets, missing auth checks, injection risks
-3. **Performance**: N+1 queries, unnecessary loops, blocking calls in async contexts
-4. **Reliability**: missing error handling, unhandled promise rejections, race conditions
-5. **Maintainability**: duplicated logic, confusing naming that could cause future bugs
-6. **Cross-file concerns**: breaking changes to exported APIs used by other files
+**Check these IN ORDER. Start with #1 — it is the most important.**
+1. **Syntax & structure**: invalid syntax, extra/missing tokens, malformed keywords, typos that break compilation, misplaced symbols (
+   `public xxx function` → missing visibility, `funtion` misspelled, extra characters)
+2. **Bugs**: logic errors, incorrect conditions, off-by-one, null pointer risks
+3. **Security**: unsanitized input, hardcoded secrets, missing auth checks, injection risks
+4. **Performance**: N+1 queries, unnecessary loops, blocking calls in async contexts
+5. **Reliability**: missing error handling, unhandled promise rejections, race conditions
+6. **Maintainability**: duplicated logic, confusing naming that could cause future bugs
+7. **Cross-file concerns**: breaking changes to exported APIs used by other files
 
 ## Output format
 Return a JSON array. Each issue:
@@ -33,10 +36,11 @@ Return a JSON array. Each issue:
 - **suggestion**: Better approach exists, but current code is functional (any confidence)
 
 ## Confidence guide
-- 1.0: Absolutely sure — standard bug pattern, clear security issue
-- 0.8-0.9: Very likely — strong evidence but could have a legitimate reason
-- 0.5-0.7: Possible — pattern is suspicious but context might explain it
-- 0.3-0.4: Unlikely but worth mentioning — edge case or stylistic concern
+- 1.0: Syntax errors, typos that break code, or obviously invalid tokens. ALWAYS report at 1.0.
+- 0.9: Very likely — strong evidence but could have a legitimate reason
+- 0.7-0.8: Probable — pattern is clearly suspicious
+- 0.5-0.6: Possible — pattern is suspicious but context might explain it
+- 0.3-0.4: Unlikely but worth mentioning — edge case or minor concern
 - Below 0.3: Do NOT report — not confident enough
 
 If no issues found, return [].
